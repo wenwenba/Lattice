@@ -77,7 +77,7 @@ For terminals with limited alternate-screen or color support, use `--inline` and
 
 During development, use `pnpm dev`. Run all checks with `pnpm check`.
 
-Website: [lattice-tui.chnova-6234.chatgpt.site](https://lattice-tui.chnova-6234.chatgpt.site) · Source: [github.com/wenwenba/Lattice](https://github.com/wenwenba/Lattice)
+Website: [wenwenba.github.io/Lattice](https://wenwenba.github.io/Lattice/) · Mirror: [lattice-tui.chnova-6234.chatgpt.site](https://lattice-tui.chnova-6234.chatgpt.site) · Source: [github.com/wenwenba/Lattice](https://github.com/wenwenba/Lattice)
 
 ## Keys
 
