@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b0e13" />
+    <meta name="description" content="Lattice 是一款运行在终端中的本地 Markdown 知识库，支持编辑、实时预览、Vault 文件管理、图片与 AI 随记整理。" />
+    <title>Lattice — 终端里的 Markdown 知识库</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23111318'/%3E%3Cpath d='M16 14v36M32 14v36M48 14v36M14 16h36M14 32h36M14 48h36' stroke='%2388c0d0' stroke-width='3'/%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到主要内容</a>
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="Lattice 首页">
+        <svg viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M7 5v22M16 5v22M25 5v22M5 7h22M5 16h22M5 25h22" />
+        </svg>
+        <span>LATTICE</span>
+        <span class="version">v0.1</span>
+      </a>
+      <nav aria-label="主要导航">
+        <a href="#features">功能</a>
+        <a href="#install">安装</a>
+        <a class="github-link" href="https://github.com/wenwenba/Lattice" target="_blank" rel="noreferrer">GitHub ↗</a>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="hero" id="top">
+        <div class="hero-copy">
+          <p class="eyebrow"><span></span> LOCAL-FIRST · OPEN SOURCE</p>
+          <h1>把知识库<br />留在终端里。</h1>
+          <p class="lede">Lattice 是一款受 Obsidian 启发的终端 Markdown 工具。普通文件夹就是 Vault，编辑、预览、链接和整理都在熟悉的命令行里完成。</p>
+          <div class="hero-actions" id="install">
+            <button class="install-command" type="button" data-copy="npm install -g lattice-tui" aria-label="复制 npm 安装命令">
+              <span class="prompt">$</span>
+              <code>npm install -g lattice-tui</code>
+              <span class="copy-label">复制</span>
+            </button>
+            <a class="text-link github-link" href="https://github.com/wenwenba/Lattice" target="_blank" rel="noreferrer">查看源代码 <span>↗</span></a>
+          </div>
+          <p class="run-hint">安装后运行 <code>lattice ./your-vault</code></p>
+        </div>
+
+        <div class="terminal-shell" aria-label="Lattice 终端界面示意">
+          <div class="terminal-bar">
+            <div class="traffic" aria-hidden="true"><i></i><i></i><i></i></div>
+            <span>lattice — ~/notes</span>
+            <span class="live"><b></b> EDIT</span>
+          </div>
+          <div class="terminal-workspace">
+            <div class="vault-pane">
+              <div class="pane-title">VAULT</div>
+              <div class="tree muted">▾ Guides</div>
+              <div class="tree active">│  ◆ Welcome.md</div>
+              <div class="tree">│  ◇ Markdown.md</div>
+              <div class="tree muted">▸ Projects</div>
+              <div class="tree">◇ Todo.md</div>
+              <div class="tree">◇ Reading.md</div>
+              <div class="tree selected">◇ 随记.md</div>
+            </div>
+            <div class="editor-pane">
+              <div class="pane-title">EDITOR <span>Welcome.md</span></div>
+              <pre><span class="ln">1</span><span class="md">#</span> Welcome to Lattice
+<span class="ln">2</span>
+<span class="ln">3</span>本地 Markdown，就是你的数据库。
+<span class="ln">4</span>
+<span class="ln">5</span><span class="md">##</span> 今天
+<span class="ln">6</span><span class="accent">- [x]</span> 整理项目笔记
+<span class="ln">7</span><span class="accent">- [ ]</span> 连接 <span class="link">[[Roadmap]]</span>
+<span class="ln">8</span>
+<span class="ln">9</span><span class="cursor">随手记录，保持流动</span></pre>
+            </div>
+            <div class="preview-pane">
+              <div class="pane-title">PREVIEW <span>LIVE</span></div>
+              <article>
+                <h3>Welcome to Lattice</h3>
+                <p>本地 Markdown，就是你的数据库。</p>
+                <h4>今天</h4>
+                <p class="task done">✓ 整理项目笔记</p>
+                <p class="task">□ 连接 <u>Roadmap</u></p>
+                <blockquote>随手记录，保持流动</blockquote>
+              </article>
+            </div>
+          </div>
+          <div class="command-bar"><span>/</span><span class="command-text">输入命令…</span><kbd>↑↓</kbd><kbd>↩</kbd></div>
+        </div>
+      </section>
+
+      <section class="manifesto" aria-label="产品原则">
+        <p>文件属于你。</p><span></span><p>流程留在终端。</p><span></span><p>格式永远开放。</p>
+      </section>
+
+      <section class="features" id="features">
+        <div class="section-heading">
+          <p class="eyebrow"><span></span> BUILT FOR FLOW</p>
+          <h2>专注记录，不切换语境。</h2>
+          <p>从文件管理到实时预览，Lattice 把常用知识库动作收进同一个终端工作区。</p>
+        </div>
+        <div class="feature-grid">
+          <article class="feature feature-wide">
+            <div class="feature-index">01</div>
+            <h3>编辑与预览，同屏发生</h3>
+            <p>打开笔记即进入编辑。标题层级、表格、代码块、链接与图片在右侧实时呈现，窄屏也会自动调整布局。</p>
+            <div class="code-sample" aria-hidden="true">
+              <span><b>```</b>typescript</span>
+              <span><em>const</em> vault = <i>await</i> open(<q>'./notes'</q>)</span>
+              <span><b>```</b></span>
+            </div>
+          </article>
+          <article class="feature">
+            <div class="feature-index">02</div>
+            <h3>普通目录就是 Vault</h3>
+            <p>创建、重命名、移动、导入与删除都在 CLI 内完成。没有专有数据库，也没有迁移成本。</p>
+            <div class="path-card"><span>~/notes/</span><strong>Projects/Launch.md</strong></div>
+          </article>
+          <article class="feature">
+            <div class="feature-index">03</div>
+            <h3>链接、图片与反向链接</h3>
+            <p>支持 Wiki Link、可点击超链接、Vault 内文件选择和剪贴板图片。附件跟随文档管理。</p>
+            <div class="link-cloud" aria-hidden="true"><span>Welcome</span><i></i><span>Roadmap</span><i></i><span>随记</span></div>
+          </article>
+          <article class="feature feature-command">
+            <div class="feature-index">04</div>
+            <h3>一个斜杠，调用所有动作</h3>
+            <p>命令面板遵循 Claude Code 式输入体验，避开系统快捷键冲突，并支持中文界面。</p>
+            <div class="command-list" aria-hidden="true">
+              <div class="chosen"><code>/jot</code><span>快速记录随记</span></div>
+              <div><code>/search</code><span>搜索 Vault</span></div>
+              <div><code>/summarize</code><span>AI 整理与汇总</span></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="ready">
+        <div>
+          <p class="eyebrow"><span></span> MACOS · LINUX · WINDOWS</p>
+          <h2>下一条命令，<br />开始你的 Vault。</h2>
+        </div>
+        <div class="ready-action">
+          <button class="install-command large" type="button" data-copy="npm install -g lattice-tui" aria-label="复制 npm 安装命令">
+            <span class="prompt">$</span><code>npm install -g lattice-tui</code><span class="copy-label">复制</span>
+          </button>
+          <p>需要 Node.js 22.18 或更高版本</p>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <a class="brand" href="#top"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 5v22M16 5v22M25 5v22M5 7h22M5 16h22M5 25h22" /></svg><span>LATTICE</span></a>
+      <p>终端里的本地 Markdown 知识库。</p>
+      <p>MIT License · <span id="year">2026</span></p>
+    </footer>
+
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>
