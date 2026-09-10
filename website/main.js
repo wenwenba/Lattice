@@ -1,4 +1,8 @@
 import './style.css';
+import { createApp } from 'vue';
+import LatticeDemo from './LatticeDemo.vue';
+
+createApp(LatticeDemo).mount('#lattice-demo');
 
 for (const button of document.querySelectorAll('[data-copy]')) {
   button.addEventListener('click', async () => {

@@ -47,6 +47,7 @@
     "vue": "^3.5.0"
   },
   "devDependencies": {
+    "@simon_he/vue-tui": "1.1.6",
     "@tsconfig/node22": "^22.0.5",
     "@types/node": "^22.18.0",
     "@vue-tui/testing": "0.3.0",

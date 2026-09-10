@@ -42,49 +42,7 @@
           <p class="run-hint">安装后运行 <code>lattice ./your-vault</code></p>
         </div>
 
-        <div class="terminal-shell" aria-label="Lattice 终端界面示意">
-          <div class="terminal-bar">
-            <div class="traffic" aria-hidden="true"><i></i><i></i><i></i></div>
-            <span>lattice — ~/notes</span>
-            <span class="live"><b></b> EDIT</span>
-          </div>
-          <div class="terminal-workspace">
-            <div class="vault-pane">
-              <div class="pane-title">VAULT</div>
-              <div class="tree muted">▾ Guides</div>
-              <div class="tree active">│  ◆ Welcome.md</div>
-              <div class="tree">│  ◇ Markdown.md</div>
-              <div class="tree muted">▸ Projects</div>
-              <div class="tree">◇ Todo.md</div>
-              <div class="tree">◇ Reading.md</div>
-              <div class="tree selected">◇ 随记.md</div>
-            </div>
-            <div class="editor-pane">
-              <div class="pane-title">EDITOR <span>Welcome.md</span></div>
-              <pre><span class="ln">1</span><span class="md">#</span> Welcome to Lattice
-<span class="ln">2</span>
-<span class="ln">3</span>本地 Markdown，就是你的数据库。
-<span class="ln">4</span>
-<span class="ln">5</span><span class="md">##</span> 今天
-<span class="ln">6</span><span class="accent">- [x]</span> 整理项目笔记
-<span class="ln">7</span><span class="accent">- [ ]</span> 连接 <span class="link">[[Roadmap]]</span>
-<span class="ln">8</span>
-<span class="ln">9</span><span class="cursor">随手记录，保持流动</span></pre>
-            </div>
-            <div class="preview-pane">
-              <div class="pane-title">PREVIEW <span>LIVE</span></div>
-              <article>
-                <h3>Welcome to Lattice</h3>
-                <p>本地 Markdown，就是你的数据库。</p>
-                <h4>今天</h4>
-                <p class="task done">✓ 整理项目笔记</p>
-                <p class="task">□ 连接 <u>Roadmap</u></p>
-                <blockquote>随手记录，保持流动</blockquote>
-              </article>
-            </div>
-          </div>
-          <div class="command-bar"><span>/</span><span class="command-text">输入命令…</span><kbd>↑↓</kbd><kbd>↩</kbd></div>
-        </div>
+        <div id="lattice-demo" class="terminal-demo-mount" aria-label="Lattice Web 交互演示"></div>
       </section>
 
       <section class="manifesto" aria-label="产品原则">
