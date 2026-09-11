@@ -1,10 +1,11 @@
+import { homedir } from "node:os";
 import { posix, win32 } from "node:path";
 import type { Keymap } from "./shortcuts.js";
 
-export const LATTICE_VERSION = "0.1.0";
+export const LATTICE_VERSION = "0.1.1";
 
 export interface CliOptions {
-  vaultPath: string;
+  vaultPath?: string;
   color: boolean;
   mode: "fullscreen" | "inline";
   help: boolean;
@@ -16,6 +17,7 @@ export function parseCliArgs(
   args: string[],
   cwd = process.cwd(),
   platform: NodeJS.Platform = process.platform,
+  home = homedir(),
 ): CliOptions {
   const path = platform === "win32" ? win32 : posix;
   let vaultPath: string | undefined;
@@ -62,7 +64,9 @@ export function parseCliArgs(
   }
 
   return {
-    vaultPath: path.resolve(cwd, vaultPath || "notes"),
+    vaultPath: vaultPath
+      ? path.resolve(cwd, vaultPath === "~" ? home : vaultPath.startsWith("~/") || vaultPath.startsWith("~\\") ? path.join(home, vaultPath.slice(2)) : vaultPath)
+      : undefined,
     color,
     mode,
     help,
@@ -79,6 +83,7 @@ export function helpText(platform: NodeJS.Platform = process.platform): string {
     "Lattice — an Obsidian-inspired terminal knowledge base",
     "",
     "Usage: lattice [vault-path] [options]",
+    "       lattice                 Reopen the last vault (creates a default vault on first run)",
     "",
     "Options:",
     "  -V, --vault <path>  Open a Markdown vault",
@@ -88,7 +93,7 @@ export function helpText(platform: NodeJS.Platform = process.platform): string {
     "  -v, --version       Print the version",
     "  -h, --help          Show this help",
     "",
-    `Example: ${example}`,
+    `Switch vault: ${example}`,
     "",
   ].join("\n");
 }

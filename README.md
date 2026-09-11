@@ -49,9 +49,10 @@ Install the published CLI:
 
 ```bash
 npm install -g lattice-tui
-mkdir -p ~/Documents/MyVault
-lattice ~/Documents/MyVault
+lattice
 ```
+
+The first run creates `~/Documents/Lattice` with a welcome note. After that, `lattice` reopens the most recently used Vault from any directory. Pass a path only when switching Vaults—for example, `lattice ~/Documents/MyVault`; that choice becomes the new default for the next launch.
 
 Or run from source:
 

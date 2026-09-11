@@ -4,6 +4,7 @@ import App from "./app.vue";
 import { helpText, LATTICE_VERSION, parseCliArgs } from "./cli.js";
 import { KITTY_GRAPHICS, KittyGraphics, KittyPlacementGraphics, graphicsOutput, kittyEnabled, usesKittyPlacements } from "./graphics.js";
 import { MOUSE_INPUT, TerminalMouseInput } from "./mouse.js";
+import { resolveStartupVault } from "./startup.js";
 
 async function main(): Promise<void> {
   let options;
@@ -29,7 +30,16 @@ async function main(): Promise<void> {
     return;
   }
 
-  const app = createApp(App, { vaultPath: options.vaultPath, keymap: options.keymap });
+  let vaultPath: string;
+  try {
+    vaultPath = await resolveStartupVault(options.vaultPath);
+  } catch (error) {
+    process.stderr.write(`Lattice: could not open the vault: ${error instanceof Error ? error.message : String(error)}\n`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const app = createApp(App, { vaultPath, keymap: options.keymap });
   const native = usesKittyPlacements(process.env) && options.mode === "fullscreen"
     && kittyEnabled({ ...process.env, LATTICE_GRAPHICS: "kitty" }, Boolean(process.stdout.isTTY), options.color);
   const graphics = native ? new KittyPlacementGraphics((data) => { process.stdout.write(data); })

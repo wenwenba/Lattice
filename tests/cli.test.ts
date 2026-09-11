@@ -15,6 +15,11 @@ describe("cross-platform CLI", () => {
     expect(helpText("win32")).toContain("C:\\Users\\me\\Documents\\Vault");
   });
 
+  it("leaves vault selection to startup when no path is supplied and expands tilde paths", () => {
+    expect(parseCliArgs([], "/work", "linux", "/home/me").vaultPath).toBeUndefined();
+    expect(parseCliArgs(["~/Notes"], "/work", "linux", "/home/me").vaultPath).toBe("/home/me/Notes");
+  });
+
   it("rejects unknown options with an actionable error", () => {
     expect(() => parseCliArgs(["--unknown"], "/work", "linux")).toThrow("Unknown option");
     expect(() => parseCliArgs(["--vault"], "/work", "linux")).toThrow("requires a folder path");
