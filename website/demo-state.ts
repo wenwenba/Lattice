@@ -1,4 +1,5 @@
 import stringWidth from 'string-width';
+import { icons } from '../src/icons';
 
 export type DemoNote = {
   id: string;
@@ -73,7 +74,7 @@ function wrapByWidth(text: string, width: number): string[] {
 
 function cleanInlineMarkdown(line: string): string {
   return line
-    .replace(/!\[([^\]]*)\]\([^)]*\)/gu, '▣ $1')
+    .replace(/!\[([^\]]*)\]\([^)]*\)/gu, `${icons.image} $1`)
     .replace(/\[([^\]]+)\]\(([^)]+)\)/gu, '$1 ↗')
     .replace(/\[\[([^\]]+)\]\]/gu, '$1 ↗')
     .replace(/\*\*([^*]+)\*\*/gu, '$1')

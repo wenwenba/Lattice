@@ -82,6 +82,10 @@ Website: [wenwenba.github.io/Lattice](https://wenwenba.github.io/Lattice/) · Mi
 
 ## Keys
 
+### Icon language
+
+Lattice uses a font-independent, single-cell geometric icon set: `▰` folder, `▫` Markdown note, `⊡` image, `▯` other file and `⌂` Vault root. `▾`/`▸` only indicate expanded/collapsed folders, while `›` marks the current selection. Entry types never change shape when selected, and no Nerd Font or Emoji support is required.
+
 Use `/move` for the full-width three-step picker: choose source, choose destination, confirm move. Type to search, use arrows or PageUp/PageDown to navigate, Home/End to jump, and Ctrl+U to clear search. The list adapts to window height and keeps the selection visible. Enter advances; the last Enter confirms the displayed source/destination. `/ (Vault root)` moves it back to the root. Escape goes back or cancels. Name conflicts are rejected without overwriting; a folder cannot move inside itself. Save unsaved edits before moving. Markdown-managed images use the existing rename migration; arbitrary inbound links are not rewritten.
 
 Use `/import` after selecting the destination folder in the vault (selecting a note uses its parent folder), then enter or paste a local source path and press Enter. Folders are copied recursively, originals are preserved, and name conflicts get numeric suffixes. Symbolic links/special files and copying a folder into its own descendants are rejected. Paths refer to the machine running Lattice, including when running over SSH.

@@ -114,9 +114,9 @@ describe("editing workspace", () => {
     const result = await render(App, { columns: 80, rows: 24, color: "truecolor", props: { vaultPath: root } });
     try {
       await vi.waitFor(() => expect(result.lastFrame()).toContain("SELECTED · 中文文件.md"));
-      const row = result.lastFrame({ raw: true }).split("\n").find((line) => line.includes("> ◇ 中文文件"));
+      const row = result.lastFrame({ raw: true }).split("\n").find((line) => line.includes("›   ▫ 中文文件"));
       expect(row).not.toContain("\x1b[7m");
-      expect(row).toMatch(/\x1b\[48;2;136;192;208m(?:\x1b\[[\d;]+m)*> ◇ 中文文件 +/);
+      expect(row).toMatch(/\x1b\[48;2;136;192;208m(?:\x1b\[[\d;]+m)*›   ▫ 中文文件 +/);
     } finally { result.dispose(); }
   });
 
@@ -125,7 +125,7 @@ describe("editing workspace", () => {
     await writeFile(join(root, 'One.md'), '# One');
     const result = await render(App, { columns: 100, rows: 24, props: { vaultPath: root, keymap } });
     try {
-      await vi.waitFor(() => expect(result.lastFrame()).toContain('◇ One'));
+      await vi.waitFor(() => expect(result.lastFrame()).toContain('▫ One'));
       await result.stdin.write('\r');
       await result.stdin.write('\x1b');
       await result.stdin.write('/');
@@ -151,17 +151,17 @@ describe("editing workspace", () => {
     await writeFile(join(root, 'One.md'), '# One');
     const result = await render(App, { columns: 60, rows: 16, props: { vaultPath: root } });
     try {
-      await vi.waitFor(() => expect(result.lastFrame()).toContain('◇ One'));
+      await vi.waitFor(() => expect(result.lastFrame()).toContain('▫ One'));
       await result.stdin.write('/move\rOne.md\r\x1b[F');
       let screen = await result.screen();
-      expect(screen.lines.some(line => line.includes('› ▸ Folder24'))).toBe(true);
+      expect(screen.lines.some(line => line.includes('› ▰ Folder24'))).toBe(true);
       expect(screen.lines.some(line => line.includes('VAULT ·'))).toBe(false);
       await result.terminal.resize(80, 13);
       screen = await result.screen();
-      expect(screen.lines.some(line => line.includes('› ▸ Folder24'))).toBe(true);
+      expect(screen.lines.some(line => line.includes('› ▰ Folder24'))).toBe(true);
       await result.stdin.write('\x1b[5~'); // PageUp: a full visible page.
       screen = await result.screen();
-      expect(screen.lines.some(line => line.includes('› ▸ Folder22'))).toBe(true);
+      expect(screen.lines.some(line => line.includes('› ▰ Folder22'))).toBe(true);
       await result.stdin.write('\r');
       expect(result.lastFrame()).toContain('Confirm move');
       await result.stdin.write('\x1b');
@@ -175,7 +175,7 @@ describe("editing workspace", () => {
     await writeFile(join(root, 'One.md'), '# One');
     const result = await render(App, { columns: 120, rows: 30, props: { vaultPath: root } });
     try {
-      await vi.waitFor(() => expect(result.lastFrame()).toContain('◇ One'));
+      await vi.waitFor(() => expect(result.lastFrame()).toContain('▫ One'));
       await result.stdin.write('/move\rOne.md\r');
       expect(result.lastFrame()).toContain('Choose destination folder');
       await result.stdin.write('Target\r');
@@ -195,14 +195,14 @@ describe("editing workspace", () => {
     await writeFile(join(external, 'Imported.md'), '# Imported');
     const result = await render(App, { columns: 120, rows: 30, props: { vaultPath: root } });
     try {
-      await vi.waitFor(() => expect(result.lastFrame()).toContain('◇ One'));
+      await vi.waitFor(() => expect(result.lastFrame()).toContain('▫ One'));
       await result.stdin.write('/settings\r'); // settings opens without affecting selection
       await result.stdin.write('\x1b');
       await result.stdin.write('/import\r');
       expect(result.lastFrame()).toContain('Destination: Projects');
       await result.stdin.write(`\x1b[200~${join(external, 'Imported.md')}\x1b[201~\r`);
       await vi.waitFor(async () => expect(await readFile(join(root, 'Projects/Imported.md'), 'utf8')).toBe('# Imported'));
-      await vi.waitFor(() => expect(result.lastFrame()).toContain('◇ Imported'));
+      await vi.waitFor(() => expect(result.lastFrame()).toContain('▫ Imported'));
     } finally { result.dispose(); }
   });
   it('auto-saves by default and persists settings and theme across restarts', async () => {
@@ -210,7 +210,7 @@ describe("editing workspace", () => {
     await writeFile(join(root, 'One.md'), 'hello');
     let result = await render(App, { columns: 120, rows: 30, props: { vaultPath: root } });
     try {
-      await vi.waitFor(() => expect(result.lastFrame()).toContain('◇ One'));
+      await vi.waitFor(() => expect(result.lastFrame()).toContain('▫ One'));
       await result.stdin.write('\r!');
       await vi.waitFor(async () => expect(await readFile(join(root, 'One.md'), 'utf8')).toBe('hello!'), { timeout: 3000 });
       await result.stdin.write('\x1b');
@@ -230,7 +230,7 @@ describe("editing workspace", () => {
       expect(await readFile(join(root, 'One.md'), 'utf8')).toBe('hello!');
       result.dispose();
       result = await render(App, { columns: 120, rows: 30, props: { vaultPath: root } });
-      await vi.waitFor(() => expect(result.lastFrame()).toContain('◇ One'));
+      await vi.waitFor(() => expect(result.lastFrame()).toContain('▫ One'));
       await result.stdin.write('/settings\r');
       await vi.waitFor(() => expect(result.lastFrame()).toContain('THEME · Nord'));
       expect(result.lastFrame()).toContain('AUTO SAVE · [ OFF ]');
@@ -245,7 +245,7 @@ describe("editing workspace", () => {
     await writeFile(join(root, "One.md"), "text");
     const result = await render(App, { columns: 120, rows: 24, props: { vaultPath: root, keymap } });
     try {
-      await vi.waitFor(() => expect(result.lastFrame()).toContain("◇ One"));
+      await vi.waitFor(() => expect(result.lastFrame()).toContain("▫ One"));
       await result.stdin.write("/help\r");
       const help = result.lastFrame();
       expect(help).toContain(`${system} · application actions use / commands`);
@@ -271,7 +271,7 @@ describe("editing workspace", () => {
     const result = await render(App, { columns: 120, rows: 30, props: { vaultPath: root, keymap } });
     const control = (letter: string, shift = false) => `\x1b[${letter.codePointAt(0)};${5 + Number(shift)}u`;
     try {
-      await vi.waitFor(() => expect(result.lastFrame()).toContain("◇ One"));
+      await vi.waitFor(() => expect(result.lastFrame()).toContain("▫ One"));
       await result.stdin.write("\r\x1b[1;5H");
       await result.stdin.write("\x1b[1;2F"); // Shift+End selects the first line on every keymap.
       await result.stdin.write(control("c"));
@@ -316,7 +316,7 @@ describe("editing workspace", () => {
     const copy = vi.spyOn(clipboard, "writeClipboardText").mockResolvedValue();
     const result = await render(App, { columns: 120, rows: 30, props: { vaultPath: root, keymap } });
     try {
-      await vi.waitFor(() => expect(result.lastFrame()).toContain("◇ One"));
+      await vi.waitFor(() => expect(result.lastFrame()).toContain("▫ One"));
       await result.stdin.write("\r\x1b[1;5H\x1b[120;7u\x1b[3;7~"); // Ctrl+Alt+X/Delete must not cut/delete.
       if (keymap !== "macos") await result.stdin.write("\x1b[120;9u\x1b[3;9:1~"); // Super is a desktop key.
       expect(copy).not.toHaveBeenCalled();
@@ -333,7 +333,7 @@ describe("editing workspace", () => {
     const copy = vi.spyOn(clipboard, "writeClipboardText").mockResolvedValue();
     const result = await render(App, { columns: 120, rows: 30, color: "truecolor", props: { vaultPath: root, keymap: "macos" } });
     try {
-      await vi.waitFor(() => expect(result.lastFrame()).toContain("◇ One"));
+      await vi.waitFor(() => expect(result.lastFrame()).toContain("▫ One"));
       await result.stdin.write("\r\x1b[1;5H\x1b[1;2C\x1b[1;2C\x03");
       await vi.waitFor(() => expect(result.lastFrame()).toContain("Selection copied"));
       expect(result.lastFrame()).toContain("⌃C copy");
@@ -375,7 +375,7 @@ describe("editing workspace", () => {
     const control = (letter: string) => `\x1b[${letter.codePointAt(0)};5u`;
     const result = await render(App, { columns: 120, rows: 30, props: { vaultPath: root, keymap: 'macos' } });
     try {
-      await vi.waitFor(() => expect(result.lastFrame()).toContain('◇ One'));
+      await vi.waitFor(() => expect(result.lastFrame()).toContain('▫ One'));
       await result.stdin.write(`\r${control('f')}alpha\r`);
       expect(result.lastFrame()).toContain('⌕ FIND');
       expect(result.lastFrame()).toContain('1 / 2');
@@ -402,7 +402,7 @@ describe("editing workspace", () => {
     const copy = vi.spyOn(clipboard, "writeClipboardText").mockResolvedValue();
     const result = await render(App, { columns: 80, rows: 24, color: "truecolor", props: { vaultPath: root, keymap: "macos" } });
     try {
-      await vi.waitFor(() => expect(result.lastFrame()).toContain("◇ One"));
+      await vi.waitFor(() => expect(result.lastFrame()).toContain("▫ One"));
       await result.stdin.write("\r\x1b[1;5H"); // Ctrl+Home puts the caret on the first CJK glyph.
       await vi.waitFor(() => expect(result.lastFrame({ raw: true })).toMatch(/\x1b\[48;2;136;192;208m(?:\x1b\[[\d;]+m)*中(?:\x1b\[[\d;]+m)*\x1b\[48;2;17;19;24m/));
       expect(result.lastFrame({ raw: true })).not.toContain("\x1b[7m");
@@ -436,7 +436,7 @@ describe("editing workspace", () => {
     const copy = vi.spyOn(clipboard, "writeClipboardText").mockResolvedValue();
     const result = await render(wrapper, { columns: 120, rows: 30, color: "truecolor", mode: "fullscreen" });
     try {
-      await vi.waitFor(() => expect(result.lastFrame()).toContain("◇ One"));
+      await vi.waitFor(() => expect(result.lastFrame()).toContain("▫ One"));
       expect(enabled).toHaveBeenLastCalledWith(false);
       await result.stdin.write("\r\x1b[1;5H");
       await vi.waitFor(() => expect(enabled).toHaveBeenLastCalledWith(true));
@@ -476,7 +476,7 @@ describe("editing workspace", () => {
     await writeFile(join(root, "One.md"), original);
     const result = await render(App, { columns: 80, rows: 24, props: { vaultPath: root } });
     try {
-      await vi.waitFor(() => expect(result.lastFrame()).toContain("◇ One"));
+      await vi.waitFor(() => expect(result.lastFrame()).toContain("▫ One"));
       await result.stdin.write("\r");
       await vi.waitFor(() => expect(result.lastFrame()).toContain("-END"));
       await result.terminal.resize(120, 30);
@@ -537,7 +537,7 @@ describe("editing workspace", () => {
     vi.spyOn(clipboard, "readClipboard").mockResolvedValue({ image: testPng() });
     const result = await render(App, { columns: 120, rows: 30, props: { vaultPath: root } });
     try {
-      await vi.waitFor(() => expect(result.lastFrame()).toContain("◇ One"));
+      await vi.waitFor(() => expect(result.lastFrame()).toContain("▫ One"));
       await result.stdin.write("\r");
       await result.stdin.write("/save\r");
       await result.stdin.write("\x16");
@@ -554,7 +554,7 @@ describe("editing workspace", () => {
     const reader = vi.spyOn(clipboard, "readClipboard").mockResolvedValue({ image: testPng() });
     const result = await render(App, { columns: 80, rows: 30, props: { vaultPath: root, keymap: "macos" } });
     try {
-      await vi.waitFor(() => expect(result.lastFrame()).toContain("◇ One"));
+      await vi.waitFor(() => expect(result.lastFrame()).toContain("▫ One"));
       await result.stdin.write("\r");
       await result.stdin.write("\x16");
       await vi.waitFor(() => expect(result.lastFrame()).toContain("Pasted image"));
@@ -620,7 +620,7 @@ describe("editing workspace", () => {
     await writeFile(join(root, "One.md"), "# One\n\n", "utf8");
     const result = await render(App, { columns: 120, rows: 30, color: true, props: { vaultPath: root } });
     try {
-      await vi.waitFor(() => expect(result.lastFrame()).toContain("◇ One"));
+      await vi.waitFor(() => expect(result.lastFrame()).toContain("▫ One"));
       await mkdir(join(root, "assets"));
       // Added after startup: opening the picker should refresh the file list.
       await writeFile(join(root, "assets", "sample.png"), testPng());
@@ -663,7 +663,7 @@ describe("editing workspace", () => {
     });
 
     try {
-      await vi.waitFor(() => expect(result.lastFrame()).toContain("◇ One"));
+      await vi.waitFor(() => expect(result.lastFrame()).toContain("▫ One"));
       await result.stdin.write("\r");
 
       expect(result.lastFrame()).toContain("EDIT · One");

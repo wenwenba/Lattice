@@ -13,7 +13,7 @@ it('uses one confirmed slash command to delete a file or a populated folder', as
   await writeFile(join(root, 'Folder', 'nested', 'data.txt'), 'data');
   const result = await render(App, { columns: 100, rows: 24, props: { vaultPath: root } });
   try {
-    await vi.waitFor(() => expect(result.lastFrame()).toContain('◇ A'));
+    await vi.waitFor(() => expect(result.lastFrame()).toContain('▫ A'));
     await result.stdin.write('/delete\r');
     expect(result.lastFrame()).toContain('Permanently delete file A.md? y/N');
     await result.stdin.write('n');
@@ -36,7 +36,7 @@ it('refuses deletion while the current note has unsaved changes', async () => {
   await writeFile(join(root, 'One.md'), '# One');
   const result = await render(App, { columns: 100, rows: 24, props: { vaultPath: root } });
   try {
-    await vi.waitFor(() => expect(result.lastFrame()).toContain('◇ One'));
+    await vi.waitFor(() => expect(result.lastFrame()).toContain('▫ One'));
     await result.stdin.write('\r!');
     await result.stdin.write('\x1b');
     await result.stdin.write('/delete\r');

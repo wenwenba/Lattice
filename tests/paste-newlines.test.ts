@@ -30,7 +30,7 @@ it.each(['terminal', 'clipboard'] as const)('pastes %s newlines as real lines, s
   const spy = vi.spyOn(clipboard, 'readClipboard').mockResolvedValue({ text: payload });
   const result = await render(App, { columns: 120, rows: 30, props: { vaultPath: root } });
   try {
-    await vi.waitFor(() => expect(result.lastFrame()).toContain('◇ One'));
+    await vi.waitFor(() => expect(result.lastFrame()).toContain('▫ One'));
     await result.stdin.write('\r');
     await result.stdin.write('\x01'); // select existing text
     await result.stdin.write(source === 'terminal' ? `\x1b[200~${payload}\x1b[201~` : '\x16');

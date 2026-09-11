@@ -9,6 +9,7 @@ import {
   type DemoNote,
   type PreviewRow,
 } from './demo-state';
+import { icons, treeEntryIcon } from '../src/icons';
 
 const STORAGE_KEY = 'lattice-web-demo-v1';
 const COLS = 80;
@@ -133,7 +134,7 @@ function rowStyle(kind: PreviewRow['kind']) {
           :x="0" :y="0" :w="VAULT_W" :h="22" border title=" VAULT " :padding="1"
           :style="{ fg: 'gray', bg: 'black' }" :title-style="{ fg: 'cyanBright', bold: true }"
         >
-          <TText :x="0" :y="0" :w="VAULT_W - 4" value="▾ demo/" :style="{ fg: 'gray', dim: true }" />
+          <TText :x="0" :y="0" :w="VAULT_W - 4" :value="`${treeEntryIcon('folder', true)} demo/`" :style="{ fg: 'gray', dim: true }" />
           <TView
             v-for="(note, index) in notes.slice(0, 8)"
             :key="note.id"
@@ -143,7 +144,7 @@ function rowStyle(kind: PreviewRow['kind']) {
           >
             <TText
               :x="0" :y="0" :w="VAULT_W - 4"
-              :value="`${note.id === activeId ? '◆' : '◇'} ${note.name}`"
+              :value="`${icons.note} ${note.name}`"
               :style="note.id === activeId
                 ? { fg: 'black', bg: 'cyanBright', bold: true }
                 : { fg: 'white' }"

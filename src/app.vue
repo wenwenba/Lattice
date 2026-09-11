@@ -24,6 +24,7 @@ import { quickNoteTime } from './quick-note.js';
 import stringWidth from 'string-width';
 import { loadAIConfig, storeAIConfig, preset, providers, summarize, type AIConfig } from './ai.js';
 import { useFindReplace } from './find-replace.js';
+import { icons, treeEntryIcon, vaultFileIcon } from './icons.js';
 
 const aiConfig = shallowRef<AIConfig>(preset('OpenAI'));
 const aiField = shallowRef(0);
@@ -386,8 +387,12 @@ const sidebarWindowStart = computed(() => Math.max(0, selectedIndex.value - visi
 const visibleSidebarItems = computed(() => sidebarItems.value.slice(sidebarWindowStart.value, sidebarWindowStart.value + visibleRows.value));
 const selectedSidebarItem = computed(() => sidebarItems.value[selectedIndex.value]);
 function sidebarItemText(item: TreeItem, selected: boolean): string {
-  const text = `${"  ".repeat(item.depth)}${selected ? "> " : "  "}${item.kind === "folder" ? (item.expanded ? "▾ " : "▸ ") : "◇ "}${item.label}`;
+  const text = `${"  ".repeat(item.depth)}${selected ? `${icons.selected} ` : "  "}${treeEntryIcon(item.kind, item.kind === 'folder' && item.expanded)} ${item.label}`;
   return text + " ".repeat(Math.max(0, sidebarWidth.value - 3 - stringWidth(text)));
+}
+function moveEntryIcon(path: string): string {
+  if (!path) return icons.root;
+  return folders.value.includes(path) ? icons.folder : vaultFileIcon(path);
 }
 const selectedPath = computed(() => selectedSidebarItem.value?.relativePath ?? "");
 const selectedPathRows = computed(() => selectedPath.value && showSidebar.value
@@ -1599,7 +1604,7 @@ function errorMessage(error: unknown): string {
             <Text v-if="!moveChoices.length" :color="theme.muted">{{ ui('No matching paths — clear the search to see available folders.', '没有匹配路径——清空搜索可查看所有文件夹。') }}</Text>
             <Box v-for="(path, index) in moveChoices.slice(moveWindowStart, moveWindowStart + moveListRows)" :key="path" :height="1" :flexShrink="0">
               <Text :color="moveWindowStart + index === moveIndex ? theme.background : theme.foreground"
-                :backgroundColor="moveWindowStart + index === moveIndex ? theme.accent : theme.background" wrap="truncate">{{ moveWindowStart + index === moveIndex ? '› ' : '  ' }}{{ path === '' || folders.includes(path) ? '▸ ' : '◇ ' }}{{ path || ui('/ (Vault root)', '/（Vault 根目录）') }}</Text>
+                :backgroundColor="moveWindowStart + index === moveIndex ? theme.accent : theme.background" wrap="truncate">{{ moveWindowStart + index === moveIndex ? `${icons.selected} ` : '  ' }}{{ moveEntryIcon(path) }} {{ path || ui('/ (Vault root)', '/（Vault 根目录）') }}</Text>
             </Box>
           </Box>
           <Text v-else :color="theme.accent">{{ enterLabel }} {{ ui('confirm move', '确认移动') }} · {{ escapeLabel }} {{ ui('choose another destination', '重新选择目标') }}</Text>
@@ -1661,7 +1666,7 @@ function errorMessage(error: unknown): string {
                 :color="filePickerWindowStart + index === filePickerIndex ? theme.background : theme.foreground"
                 :backgroundColor="filePickerWindowStart + index === filePickerIndex ? theme.accent : theme.background"
                 wrap="truncate"
-              >{{ filePickerWindowStart + index === filePickerIndex ? "› " : "  " }}{{ file.relativePath.endsWith(".md") ? "◇ " : "◆ " }}{{ file.relativePath }}</Text>
+              >{{ filePickerWindowStart + index === filePickerIndex ? `${icons.selected} ` : "  " }}{{ vaultFileIcon(file.relativePath) }} {{ file.relativePath }}</Text>
             </Box>
             <Box v-if="pickingImage" ref="pickerPreviewBox" flexDirection="column" :flexGrow="1" :flexShrink="1" :flexBasis="0" :paddingLeft="pickerSplit ? 2 : 0" :paddingTop="pickerSplit ? 0 : 1" overflow="hidden">
               <Box :height="1" :flexShrink="0"><Text bold :color="theme.accent" wrap="truncate">{{ ui('IMAGE PREVIEW', '图片预览') }} · {{ graphics?.label ?? ui('thumbnail', '缩略图') }}</Text></Box>
