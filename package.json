@@ -5,7 +5,7 @@
   "type": "module",
   "license": "MIT",
   "author": "WENWENBABA",
-  "homepage": "https://lattice-tui.chnova-6234.chatgpt.site",
+  "homepage": "https://wenwenba.github.io/Lattice/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/wenwenba/Lattice.git"
@@ -47,12 +47,14 @@
     "vue": "^3.5.0"
   },
   "devDependencies": {
+    "@iconify-icons/lucide": "2.0.6",
     "@simon_he/vue-tui": "1.1.6",
     "@tsconfig/node22": "^22.0.5",
     "@types/node": "^22.18.0",
     "@vue-tui/testing": "0.3.0",
     "@vue-tui/vite": "0.3.1",
     "@vue/tsconfig": "^0.9.1",
+    "iconify-icon": "3.0.2",
     "typescript": "~6.0.0",
     "unplugin-vue": "7.2.0",
     "vite": "8.2.1",

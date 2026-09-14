@@ -84,7 +84,7 @@ Website: [wenwenba.github.io/Lattice](https://wenwenba.github.io/Lattice/) · Mi
 
 ### Icon language
 
-Lattice uses a font-independent, single-cell geometric icon set: `▰` folder, `▫` Markdown note, `⊡` image, `▯` other file and `⌂` Vault root. `▾`/`▸` only indicate expanded/collapsed folders, while `›` marks the current selection. Entry types never change shape when selected, and no Nerd Font or Emoji support is required.
+Lattice uses Nerd Font icons directly. Configure a Nerd Font Mono in your terminal before running the CLI; Lattice does not install or change terminal fonts. The website demo embeds only the required glyphs, and folder, note and image icons use distinct colors tuned for every built-in theme.
 
 Use `/move` for the full-width three-step picker: choose source, choose destination, confirm move. Type to search, use arrows or PageUp/PageDown to navigate, Home/End to jump, and Ctrl+U to clear search. The list adapts to window height and keeps the selection visible. Enter advances; the last Enter confirms the displayed source/destination. `/ (Vault root)` moves it back to the root. Escape goes back or cancels. Name conflicts are rejected without overwriting; a folder cannot move inside itself. Save unsaved edits before moving. Markdown-managed images use the existing rename migration; arbitrary inbound links are not rewritten.
 

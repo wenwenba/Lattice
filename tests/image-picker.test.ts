@@ -35,7 +35,7 @@ describe("image selection preview", () => {
     const result = await render(wrapper, { columns: 120, rows: 30, mode: "fullscreen", color: "truecolor" });
     const currentImage = () => viewport.mock.lastCall?.[0][0]?.graphic;
     try {
-      await vi.waitFor(() => expect(result.lastFrame()).toContain("▫ One"));
+      await vi.waitFor(() => expect(result.lastFrame()).toContain(" One"));
       await result.stdin.write("\r");
       await result.stdin.write("/image\r");
       await vi.waitFor(() => expect(currentImage()).toBeDefined());
@@ -87,7 +87,7 @@ describe("image selection preview", () => {
     });
     const result = await render(App, { columns: 120, rows: 30, props: { vaultPath: root } });
     try {
-      await vi.waitFor(() => expect(result.lastFrame()).toContain("▫ One"));
+      await vi.waitFor(() => expect(result.lastFrame()).toContain(" One"));
       await result.stdin.write("\r");
       await result.stdin.write("/"); await result.stdin.write("image"); await result.stdin.write("\r");
       await vi.waitFor(() => expect(result.lastFrame()).toContain("Loading image"));

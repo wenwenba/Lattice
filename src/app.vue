@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, inject, onMounted, onUnmounted, shallowRef, watch, watchEffect } from "vue";
-import { Box, Text, useApp, useInput, useLayoutSize, useBoxMetrics, type TuiInputEvent } from "@vue-tui/runtime";
+import { Box, Text, useApp, useInput, useLayoutSize, useBoxMetrics, type Color, type TuiInputEvent } from "@vue-tui/runtime";
 import { backspace, deleteForward, deleteWord, editorLines, insertText, moveCursor, selectionRange, selectedText, selectAll, setCursor, cursorAtPoint, cursorColumn, cursorCellWidth, EditorHistory, type EditorState } from "./editor.js";
 import { markdownVaultFileLink, terminalHyperlink } from "./links.js";
 import { renderMarkdown, wrapRenderLine } from "./markdown.js";
@@ -24,7 +24,7 @@ import { quickNoteTime } from './quick-note.js';
 import stringWidth from 'string-width';
 import { loadAIConfig, storeAIConfig, preset, providers, summarize, type AIConfig } from './ai.js';
 import { useFindReplace } from './find-replace.js';
-import { icons, treeEntryIcon, vaultFileIcon } from './icons.js';
+import { icons, vaultFileKind, type VaultIconKind } from './icons.js';
 
 const aiConfig = shallowRef<AIConfig>(preset('OpenAI'));
 const aiField = shallowRef(0);
@@ -386,13 +386,30 @@ const sidebarItems = computed(() => searchFilter.value
 const sidebarWindowStart = computed(() => Math.max(0, selectedIndex.value - visibleRows.value + 2));
 const visibleSidebarItems = computed(() => sidebarItems.value.slice(sidebarWindowStart.value, sidebarWindowStart.value + visibleRows.value));
 const selectedSidebarItem = computed(() => sidebarItems.value[selectedIndex.value]);
-function sidebarItemText(item: TreeItem, selected: boolean): string {
-  const text = `${"  ".repeat(item.depth)}${selected ? `${icons.selected} ` : "  "}${treeEntryIcon(item.kind, item.kind === 'folder' && item.expanded)} ${item.label}`;
-  return text + " ".repeat(Math.max(0, sidebarWidth.value - 3 - stringWidth(text)));
+function iconColor(kind: VaultIconKind, selected: boolean): Color {
+  if (selected) return theme.value.background;
+  if (kind === 'folder') return theme.value.folder;
+  if (kind === 'note') return theme.value.note;
+  if (kind === 'image') return theme.value.image;
+  if (kind === 'root') return theme.value.accent;
+  return theme.value.muted;
+}
+function sidebarItemParts(item: TreeItem, selected: boolean) {
+  const disclosure = item.kind === 'folder' ? (item.expanded ? icons.expanded : icons.collapsed) : ' ';
+  const lead = `${"  ".repeat(item.depth)}${selected ? `${icons.selected} ` : "  "}${disclosure} `;
+  const icon = item.kind === 'folder' ? icons.folder : icons.note;
+  const label = ` ${item.label}`;
+  const padding = " ".repeat(Math.max(0, sidebarWidth.value - 3 - stringWidth(`${lead}${icon}${label}`)));
+  return { item, selected, lead, icon, label: `${label}${padding}` };
+}
+const visibleSidebarRows = computed(() => visibleSidebarItems.value.map((item, index) =>
+  sidebarItemParts(item, sidebarWindowStart.value + index === selectedIndex.value)));
+function moveEntryKind(path: string): VaultIconKind {
+  if (!path) return 'root';
+  return folders.value.includes(path) ? 'folder' : vaultFileKind(path);
 }
 function moveEntryIcon(path: string): string {
-  if (!path) return icons.root;
-  return folders.value.includes(path) ? icons.folder : vaultFileIcon(path);
+  return icons[moveEntryKind(path)];
 }
 const selectedPath = computed(() => selectedSidebarItem.value?.relativePath ?? "");
 const selectedPathRows = computed(() => selectedPath.value && showSidebar.value
@@ -1528,17 +1545,17 @@ function errorMessage(error: unknown): string {
         </Box>
         <Box v-else flexDirection="column">
           <Box
-            v-for="(item, index) in visibleSidebarItems"
-            :key="item.key"
+            v-for="(row, index) in visibleSidebarRows"
+            :key="row.item.key"
             :height="1"
             :flexShrink="0"
             :backgroundColor="sidebarWindowStart + index === selectedIndex ? theme.accent : undefined"
           >
             <Text
-              :color="sidebarWindowStart + index === selectedIndex ? theme.background : item.kind === 'folder' ? '#f7c873' : theme.foreground"
-              :bold="sidebarWindowStart + index !== selectedIndex && item.kind === 'folder'"
+              :color="row.selected ? theme.background : theme.foreground"
+              :bold="row.selected"
               wrap="truncate"
-            >{{ sidebarItemText(item, sidebarWindowStart + index === selectedIndex) }}</Text>
+            >{{ row.lead }}<Text :color="iconColor(row.item.kind, row.selected)" bold>{{ row.icon }}</Text>{{ row.label }}</Text>
           </Box>
         </Box>
       </Box>
@@ -1604,7 +1621,7 @@ function errorMessage(error: unknown): string {
             <Text v-if="!moveChoices.length" :color="theme.muted">{{ ui('No matching paths — clear the search to see available folders.', '没有匹配路径——清空搜索可查看所有文件夹。') }}</Text>
             <Box v-for="(path, index) in moveChoices.slice(moveWindowStart, moveWindowStart + moveListRows)" :key="path" :height="1" :flexShrink="0">
               <Text :color="moveWindowStart + index === moveIndex ? theme.background : theme.foreground"
-                :backgroundColor="moveWindowStart + index === moveIndex ? theme.accent : theme.background" wrap="truncate">{{ moveWindowStart + index === moveIndex ? `${icons.selected} ` : '  ' }}{{ moveEntryIcon(path) }} {{ path || ui('/ (Vault root)', '/（Vault 根目录）') }}</Text>
+                :backgroundColor="moveWindowStart + index === moveIndex ? theme.accent : theme.background" wrap="truncate">{{ moveWindowStart + index === moveIndex ? `${icons.selected} ` : '  ' }}<Text :color="iconColor(moveEntryKind(path), moveWindowStart + index === moveIndex)" bold>{{ moveEntryIcon(path) }}</Text> {{ path || ui('/ (Vault root)', '/（Vault 根目录）') }}</Text>
             </Box>
           </Box>
           <Text v-else :color="theme.accent">{{ enterLabel }} {{ ui('confirm move', '确认移动') }} · {{ escapeLabel }} {{ ui('choose another destination', '重新选择目标') }}</Text>
@@ -1666,7 +1683,7 @@ function errorMessage(error: unknown): string {
                 :color="filePickerWindowStart + index === filePickerIndex ? theme.background : theme.foreground"
                 :backgroundColor="filePickerWindowStart + index === filePickerIndex ? theme.accent : theme.background"
                 wrap="truncate"
-              >{{ filePickerWindowStart + index === filePickerIndex ? `${icons.selected} ` : "  " }}{{ vaultFileIcon(file.relativePath) }} {{ file.relativePath }}</Text>
+              >{{ filePickerWindowStart + index === filePickerIndex ? `${icons.selected} ` : "  " }}<Text :color="iconColor(vaultFileKind(file.relativePath), filePickerWindowStart + index === filePickerIndex)" bold>{{ icons[vaultFileKind(file.relativePath)] }}</Text> {{ file.relativePath }}</Text>
             </Box>
             <Box v-if="pickingImage" ref="pickerPreviewBox" flexDirection="column" :flexGrow="1" :flexShrink="1" :flexBasis="0" :paddingLeft="pickerSplit ? 2 : 0" :paddingTop="pickerSplit ? 0 : 1" overflow="hidden">
               <Box :height="1" :flexShrink="0"><Text bold :color="theme.accent" wrap="truncate">{{ ui('IMAGE PREVIEW', '图片预览') }} · {{ graphics?.label ?? ui('thumbnail', '缩略图') }}</Text></Box>

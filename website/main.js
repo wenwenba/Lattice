@@ -1,6 +1,17 @@
 import './style.css';
 import { createApp } from 'vue';
+import { addIcon } from 'iconify-icon';
+import commandIcon from '@iconify-icons/lucide/command';
+import copyIcon from '@iconify-icons/lucide/copy';
+import folderTreeIcon from '@iconify-icons/lucide/folder-tree';
+import githubIcon from '@iconify-icons/lucide/github';
+import linkIcon from '@iconify-icons/lucide/link';
+import panelsIcon from '@iconify-icons/lucide/panels-top-left';
 import LatticeDemo from './LatticeDemo.vue';
+
+for (const [name, icon] of Object.entries({ command: commandIcon, copy: copyIcon, folder: folderTreeIcon, github: githubIcon, link: linkIcon, panels: panelsIcon })) {
+  addIcon(`lattice:${name}`, icon);
+}
 
 createApp(LatticeDemo).mount('#lattice-demo');
 

@@ -2,10 +2,10 @@ import { readFile, writeFile, rename, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { languages, type Language } from './i18n.js';
 export const themes = {
-  lattice: { name: 'Lattice', background: '#111318', foreground: '#c6ccd6', muted: '#8993a4', border: '#343a46', accent: '#88c0d0' },
-  nord: { name: 'Nord', background: '#2e3440', foreground: '#eceff4', muted: '#a5b1c2', border: '#4c566a', accent: '#88c0d0' },
-  dracula: { name: 'Dracula', background: '#282a36', foreground: '#f8f8f2', muted: '#a5a8c5', border: '#44475a', accent: '#bd93f9' },
-  light: { name: 'Paper', background: '#faf8f2', foreground: '#292d35', muted: '#596273', border: '#c6cbd3', accent: '#476b91' },
+  lattice: { name: 'Lattice', background: '#111318', foreground: '#c6ccd6', muted: '#8993a4', border: '#343a46', accent: '#88c0d0', folder: '#e5b567', note: '#7dcfff', image: '#c099ff' },
+  nord: { name: 'Nord', background: '#2e3440', foreground: '#eceff4', muted: '#a5b1c2', border: '#4c566a', accent: '#88c0d0', folder: '#ebcb8b', note: '#8fbcbb', image: '#b48ead' },
+  dracula: { name: 'Dracula', background: '#282a36', foreground: '#f8f8f2', muted: '#a5a8c5', border: '#44475a', accent: '#bd93f9', folder: '#f1fa8c', note: '#8be9fd', image: '#ff79c6' },
+  light: { name: 'Paper', background: '#faf8f2', foreground: '#292d35', muted: '#596273', border: '#c6cbd3', accent: '#476b91', folder: '#8a5a18', note: '#346b8c', image: '#864879' },
 } as const;
 export type Settings = { autoSave: boolean; theme: keyof typeof themes; language: Language };
 export const defaultSettings: Settings = { autoSave: true, theme: 'lattice', language: 'en' };

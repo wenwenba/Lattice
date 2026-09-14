@@ -18,7 +18,7 @@ it('renders bottom suggestions, completes, executes and preserves document text'
   await writeFile(join(root, 'One.md'), '# One');
   const result = await render(App, { columns: 80, rows: 24, props: { vaultPath: root } });
   try {
-    await vi.waitFor(() => expect(result.lastFrame()).toContain('▫ One'));
+    await vi.waitFor(() => expect(result.lastFrame()).toContain(' One'));
     await result.stdin.write('/sett\t');
     let screen = await result.screen();
     expect(screen.lines.some(line => line.includes('❯ /settings'))).toBe(true);

@@ -12,7 +12,7 @@ it.each(['macos', 'windows', 'linux'] as const)('routes application actions only
   await storeSettings(root, { autoSave: false, theme: 'lattice', language: 'en' });
   const result = await render(App, { columns: 100, rows: 24, props: { vaultPath: root, keymap } });
   try {
-    await vi.waitFor(() => expect(result.lastFrame()).toContain('▫ One'));
+    await vi.waitFor(() => expect(result.lastFrame()).toContain(' One'));
     await result.stdin.write('\x10\x13\x07snp?d');
     expect(result.lastFrame()).not.toContain('SETTINGS');
     expect(result.lastFrame()).not.toContain('COMMANDS ·');
@@ -34,7 +34,7 @@ it('keeps q as the browse-mode quit shortcut', async () => {
   await writeFile(join(root, 'One.md'), '# One');
   const result = await render(App, { columns: 80, rows: 20, props: { vaultPath: root } });
   try {
-    await vi.waitFor(() => expect(result.lastFrame()).toContain('▫ One'));
+    await vi.waitFor(() => expect(result.lastFrame()).toContain(' One'));
     await result.stdin.write('q');
     await result.waitUntilExit();
   } finally { result.dispose(); await rm(root, { recursive: true, force: true }); }
