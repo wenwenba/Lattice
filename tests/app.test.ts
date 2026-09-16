@@ -20,6 +20,17 @@ afterEach(async () => {
 });
 
 describe("editing workspace", () => {
+  it("shows a non-blocking update notice when a newer version is available", async () => {
+    const root = await mkdtemp(join(tmpdir(), "lattice-update-notice-")); temporaryRoots.push(root);
+    await writeFile(join(root, "A.md"), "# A");
+    const result = await render(App, { columns: 100, rows: 24, props: { vaultPath: root, updateCheck: Promise.resolve("9.0.0") } });
+    try {
+      await vi.waitFor(() => expect(result.lastFrame()).toContain("Update available: v9.0.0"));
+      expect(result.lastFrame()).toContain("↑ v9.0.0");
+      expect(result.lastFrame()).toContain("npm install -g lattice-tui@latest");
+    } finally { result.dispose(); }
+  });
+
   it("returns focus to the vault after leaving edit mode", async () => {
     const root = await mkdtemp(join(tmpdir(), "lattice-edit-focus-")); temporaryRoots.push(root);
     await writeFile(join(root, "A.md"), "# A");

@@ -162,8 +162,9 @@ interface Command {
   run: () => void | Promise<void>;
 }
 
-const props = defineProps<{ vaultPath: string; keymap?: Keymap }>();
+const props = defineProps<{ vaultPath: string; keymap?: Keymap; updateCheck?: Promise<string | undefined> }>();
 const vault = new Vault(props.vaultPath);
+const availableUpdate = shallowRef<string>();
 const moving = shallowRef(false);
 const moveSource = shallowRef<string>();
 const moveQuery = shallowRef('');
@@ -356,6 +357,7 @@ const sidebarWidth = computed(() => Math.max(24, Math.min(38, Math.floor(layout.
 const showSidebar = computed(() => !['move', 'settings', 'ai-config', 'ai-review'].includes(mode.value) && ((mode.value !== "edit" && !pickingImage.value) || layout.width.value >= 96));
 const viewportHeight = computed(() => Number.isFinite(layout.height.value) ? layout.height.value : 24);
 const footerHint = computed(() => {
+  if (availableUpdate.value) return ui(`Update available · npm install -g lattice-tui@latest`, `有新版本 · npm install -g lattice-tui@latest`);
   if (mode.value === 'edit' && findMode.value !== 'closed') return findMode.value === 'find'
     ? ui(`${enterLabel} next · ${shiftLabel}+${enterLabel} previous · ${escapeLabel} close`, `${enterLabel} 下一个 · ${shiftLabel}+${enterLabel} 上一个 · ${escapeLabel} 关闭`)
     : ui(`${tabLabel} field/action · ${enterLabel} run · ${shiftLabel}+${enterLabel} previous · ${escapeLabel} close`, `${tabLabel} 切换字段/操作 · ${enterLabel} 执行 · ${shiftLabel}+${enterLabel} 上一个 · ${escapeLabel} 关闭`);
@@ -582,6 +584,11 @@ onMounted(async () => {
   settingsReady.value = true;
   try { aiConfig.value = await loadAIConfig(vault.root); }
   catch (error) { status.value = `${ui('AI config failed', 'AI 配置加载失败')}: ${errorMessage(error)}`; }
+  const latest = await props.updateCheck;
+  if (latest && !disposed) {
+    availableUpdate.value = latest;
+    status.value = ui(`Update available: v${latest}`, `发现新版本：v${latest}`);
+  }
 });
 
 useInput(function handleInput(event) {
@@ -1511,7 +1518,9 @@ function errorMessage(error: unknown): string {
         <Text bold color="#9ee493">◆ LATTICE</Text>
         <Text :color="theme.muted"> · {{ vault.root }}</Text>
         <Box :flexGrow="1" />
-        <Text :color="isDirty ? 'yellow' : theme.muted">{{ isDirty ? ui('● modified', '● 已修改') : ui(`${notes.length} notes`, `${notes.length} 篇笔记`) }}</Text>
+        <Text v-if="isDirty" color="yellow">{{ ui('● modified', '● 已修改') }}</Text>
+        <Text v-else-if="availableUpdate" bold color="yellow">↑ v{{ availableUpdate }}</Text>
+        <Text v-else :color="theme.muted">{{ ui(`${notes.length} notes`, `${notes.length} 篇笔记`) }}</Text>
       </Box>
       <Text v-if="selectedPath && showSidebar" :color="theme.accent" wrap="wrap">{{ ui('SELECTED', '已选择') }} · {{ selectedPath }}</Text>
     </Box>

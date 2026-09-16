@@ -5,6 +5,7 @@ import { helpText, LATTICE_VERSION, parseCliArgs } from "./cli.js";
 import { KITTY_GRAPHICS, KittyGraphics, KittyPlacementGraphics, graphicsOutput, kittyEnabled, usesKittyPlacements } from "./graphics.js";
 import { MOUSE_INPUT, TerminalMouseInput } from "./mouse.js";
 import { resolveStartupVault } from "./startup.js";
+import { checkForUpdate } from "./update-check.js";
 
 async function main(): Promise<void> {
   let options;
@@ -39,7 +40,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const app = createApp(App, { vaultPath, keymap: options.keymap });
+  const app = createApp(App, { vaultPath, keymap: options.keymap, updateCheck: checkForUpdate(LATTICE_VERSION) });
   const native = usesKittyPlacements(process.env) && options.mode === "fullscreen"
     && kittyEnabled({ ...process.env, LATTICE_GRAPHICS: "kitty" }, Boolean(process.stdout.isTTY), options.color);
   const graphics = native ? new KittyPlacementGraphics((data) => { process.stdout.write(data); })
