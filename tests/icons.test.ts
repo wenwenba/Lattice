@@ -8,8 +8,8 @@ describe('icon language', () => {
   });
 
   it('separates entry type from disclosure and selection state', () => {
-    expect(treeEntryIcon('folder', false)).toBe('▸ ');
-    expect(treeEntryIcon('folder', true)).toBe('▾ ');
+    expect(treeEntryIcon('folder', false)).toBe('\ueab6 ');
+    expect(treeEntryIcon('folder', true)).toBe('\ueab4 ');
     expect(treeEntryIcon('note')).toBe('  ');
     expect(vaultFileIcon('Notes/Idea.md')).toBe('');
     expect(vaultFileIcon('assets/cover.png')).toBe('');

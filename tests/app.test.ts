@@ -125,9 +125,10 @@ describe("editing workspace", () => {
     const result = await render(App, { columns: 80, rows: 24, color: "truecolor", props: { vaultPath: root } });
     try {
       await vi.waitFor(() => expect(result.lastFrame()).toContain("SELECTED · 中文文件.md"));
-      const row = result.lastFrame({ raw: true }).split("\n").find((line) => line.includes("›    中文文件"));
+      const row = result.lastFrame({ raw: true }).split("\n").find((line) => line.includes(" 中文文件"));
       expect(row).not.toContain("\x1b[7m");
-      expect(row).toMatch(/\x1b\[48;2;136;192;208m(?:\x1b\[[\d;]+m)*›    中文文件 +/);
+      expect(row).not.toContain("›");
+      expect(row).toMatch(/\x1b\[48;2;136;192;208m(?:\x1b\[[\d;]+m)*   中文文件 +/);
     } finally { result.dispose(); }
   });
 

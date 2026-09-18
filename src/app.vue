@@ -398,7 +398,7 @@ function iconColor(kind: VaultIconKind, selected: boolean): Color {
 }
 function sidebarItemParts(item: TreeItem, selected: boolean) {
   const disclosure = item.kind === 'folder' ? (item.expanded ? icons.expanded : icons.collapsed) : ' ';
-  const lead = `${"  ".repeat(item.depth)}${selected ? `${icons.selected} ` : "  "}${disclosure} `;
+  const lead = `${"  ".repeat(item.depth)}${disclosure} `;
   const icon = item.kind === 'folder' ? icons.folder : icons.note;
   const label = ` ${item.label}`;
   const padding = " ".repeat(Math.max(0, sidebarWidth.value - 3 - stringWidth(`${lead}${icon}${label}`)));
@@ -1560,11 +1560,8 @@ function errorMessage(error: unknown): string {
             :flexShrink="0"
             :backgroundColor="sidebarWindowStart + index === selectedIndex ? theme.accent : undefined"
           >
-            <Text
-              :color="row.selected ? theme.background : theme.foreground"
-              :bold="row.selected"
-              wrap="truncate"
-            >{{ row.lead }}<Text :color="iconColor(row.item.kind, row.selected)" bold>{{ row.icon }}</Text>{{ row.label }}</Text>
+            <Text :color="row.selected ? theme.background : theme.foreground" wrap="truncate"
+            >{{ row.lead }}<Text :color="iconColor(row.item.kind, row.selected)" :bold="false">{{ row.icon }}</Text>{{ row.label }}</Text>
           </Box>
         </Box>
       </Box>

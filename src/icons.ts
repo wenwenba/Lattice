@@ -1,7 +1,7 @@
 export const icons = {
   selected: '›',
-  expanded: '▾',
-  collapsed: '▸',
+  expanded: '\ueab4', // Nerd Font Codicons: paired chevrons share the same icon grid.
+  collapsed: '\ueab6',
   root: '',
   folder: '',
   note: '',
