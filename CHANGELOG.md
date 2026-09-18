@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.5] - 2026-09-18
+
+### Fixed
+
+- Keep the Vault file tree visible in the website demo while editing.
+- Match the product's three-pane editing layout with the Vault, editor, and live preview shown together.
+
+### Validation
+
+- 157 tests passed across 28 test files.
+- Type checking, CLI build, and website build passed.
+
 ## [0.1.4] - 2026-09-18
 
 ### Changed
@@ -15,4 +27,5 @@
 - 157 tests passed across 28 test files.
 - Type checking, CLI build, and website build passed.
 
+[0.1.5]: https://github.com/wenwenba/Lattice/releases/tag/v0.1.5
 [0.1.4]: https://github.com/wenwenba/Lattice/releases/tag/v0.1.4

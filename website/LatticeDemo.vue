@@ -27,7 +27,7 @@ const HEADER_H = 3;
 const BODY_H = 17;
 const COMMAND_BODY_H = 11;
 const SIDEBAR_W = 27;
-const EDITOR_W = Math.floor(COLS / 2);
+const EDITOR_W = Math.floor((COLS - SIDEBAR_W) / 2);
 const DOCK_Y = 20;
 const FOOTER_Y = 24;
 
@@ -76,7 +76,7 @@ const sidebarItems = computed(() => mode.value === 'search'
 const surfaceMode = computed(() => mode.value === 'commands' ? commandReturn.value : mode.value);
 const editing = computed(() => surfaceMode.value === 'edit');
 const bodyHeight = computed(() => mode.value === 'commands' ? COMMAND_BODY_H : BODY_H);
-const previewWidth = computed(() => editing.value ? COLS - EDITOR_W - 4 : COLS - SIDEBAR_W - 4);
+const previewWidth = computed(() => editing.value ? COLS - SIDEBAR_W - EDITOR_W - 4 : COLS - SIDEBAR_W - 4);
 const content = computed({
   get: () => activeNote.value.content,
   set: (value: string) => updateDemoNote(activeNote.value, value),
@@ -394,20 +394,20 @@ function rowStyle(row: PreviewRow) {
         <TText :x="1" :y="1" :w="COLS - 2" :value="`已选择 · ${selectedPath}`" :style="{ fg: 'cyan' }" />
         <TText :x="0" :y="2" :w="COLS" :value="'─'.repeat(COLS)" :style="{ fg: 'gray', dim: true }" />
 
-        <template v-if="!editing">
-          <TText :x="1" :y="HEADER_H" :w="SIDEBAR_W - 2" :value="mode === 'search' ? `搜索 · ${searchedNotes.length}` : `VAULT · ${folders.length}`" :style="{ fg: 'greenBright', bold: true }" />
-          <TView
-            v-for="(item, index) in visibleSidebarItems"
-            :key="item.key"
-            :x="0" :y="HEADER_H + 2 + index" :w="SIDEBAR_W - 1" :h="1"
-            focusable
-            @click="selectTreeItem(item)"
-            @keydown.enter="selectTreeItem(item)"
-          >
-            <TText :x="0" :y="0" :w="SIDEBAR_W - 1" :value="treeRowText(item)" :style="treeRowStyle(item)" />
-          </TView>
-          <TText v-for="index in bodyHeight" :key="`divider-${index}`" :x="SIDEBAR_W - 1" :y="HEADER_H + index - 1" :w="1" value="│" :style="{ fg: 'gray', dim: true }" />
+        <TText :x="1" :y="HEADER_H" :w="SIDEBAR_W - 2" :value="mode === 'search' ? `搜索 · ${searchedNotes.length}` : `VAULT · ${folders.length}`" :style="{ fg: 'greenBright', bold: true }" />
+        <TView
+          v-for="(item, index) in visibleSidebarItems"
+          :key="item.key"
+          :x="0" :y="HEADER_H + 2 + index" :w="SIDEBAR_W - 1" :h="1"
+          focusable
+          @click="selectTreeItem(item)"
+          @keydown.enter="selectTreeItem(item)"
+        >
+          <TText :x="0" :y="0" :w="SIDEBAR_W - 1" :value="treeRowText(item)" :style="treeRowStyle(item)" />
+        </TView>
+        <TText v-for="index in bodyHeight" :key="`divider-${index}`" :x="SIDEBAR_W - 1" :y="HEADER_H + index - 1" :w="1" value="│" :style="{ fg: 'gray', dim: true }" />
 
+        <template v-if="!editing">
           <template v-if="helpVisible">
             <TText :x="SIDEBAR_W + 2" :y="HEADER_H" :w="COLS - SIDEBAR_W - 3" value="键盘帮助 · 应用功能使用 / 命令" :style="{ fg: 'cyanBright', bold: true }" />
             <TText :x="SIDEBAR_W + 2" :y="HEADER_H + 2" :w="COLS - SIDEBAR_W - 3" value="Enter   打开并编辑所选笔记" :style="{ fg: 'white' }" />
@@ -428,7 +428,7 @@ function rowStyle(row: PreviewRow) {
 
         <template v-else>
           <TInputBox
-            :x="0" :y="HEADER_H" :w="EDITOR_W" :h="bodyHeight"
+            :x="SIDEBAR_W" :y="HEADER_H" :w="EDITOR_W" :h="bodyHeight"
             :title="` EDIT · ${activeNote.title} `"
             v-model="content"
             placeholder="在这里输入 Markdown…"
@@ -437,14 +437,14 @@ function rowStyle(row: PreviewRow) {
             cursor-shape="bar"
           />
           <TBox
-            :x="EDITOR_W" :y="HEADER_H" :w="COLS - EDITOR_W" :h="bodyHeight"
+            :x="SIDEBAR_W + EDITOR_W" :y="HEADER_H" :w="COLS - SIDEBAR_W - EDITOR_W" :h="bodyHeight"
             border title=" LIVE PREVIEW · thumbnail " :padding="1"
             :style="{ fg: 'gray', bg: 'black' }" :title-style="{ fg: 'cyanBright', bold: true }"
           >
             <TText
               v-for="(row, index) in previewRows"
               :key="`${index}-${row.text}`"
-              :x="0" :y="index" :w="COLS - EDITOR_W - 4" :h="1"
+              :x="0" :y="index" :w="COLS - SIDEBAR_W - EDITOR_W - 4" :h="1"
               :value="row.text" :style="rowStyle(row)"
             />
           </TBox>
