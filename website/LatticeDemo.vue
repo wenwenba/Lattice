@@ -189,20 +189,19 @@ function resizeSelectedFolder(expand: boolean): void {
 }
 
 function treeRowText(item: TreeItem): string {
-  const selected = item.key === selectedKey.value;
   const indent = '  '.repeat(item.depth);
-  const marker = selected ? `${icons.selected} ` : '  ';
-  const icon = item.kind === 'folder'
-    ? `${item.expanded ? icons.expanded : icons.collapsed} ${icons.folder}`
-    : `  ${icons.note}`;
-  return `${indent}${marker}${icon} ${item.label}`;
+  const disclosure = item.kind === 'folder'
+    ? (item.expanded ? icons.expanded : icons.collapsed)
+    : ' ';
+  const icon = item.kind === 'folder' ? icons.folder : icons.note;
+  return `${indent}${disclosure} ${icon} ${item.label}`;
 }
 
 function treeRowStyle(item: TreeItem) {
   const selected = item.key === selectedKey.value;
   return selected
-    ? { fg: 'black', bg: 'cyanBright', bold: true }
-    : { fg: item.kind === 'folder' ? 'yellow' : 'cyan', bold: item.kind === 'folder' };
+    ? { fg: 'black', bg: 'cyanBright' }
+    : { fg: item.kind === 'folder' ? 'yellow' : 'cyan' };
 }
 
 function openCommands(): void {
