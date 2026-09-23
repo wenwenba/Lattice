@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0b0e13" />
-    <meta name="description" content="Lattice 是一款运行在终端中的本地 Markdown 知识库，支持编辑、实时预览、Vault 文件管理、图片与 AI 随记整理。" />
+    <meta name="description" content="Lattice 是一款运行在终端中的本地 Markdown 知识库，支持搜索筛选、双向链接、可恢复删除、编辑与实时预览。" />
     <title>Lattice — 终端里的 Markdown 知识库</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23111318'/%3E%3Cpath d='M16 14v36M32 14v36M48 14v36M14 16h36M14 32h36M14 48h36' stroke='%2388c0d0' stroke-width='3'/%3E%3C/svg%3E" />
   </head>
@@ -16,7 +16,7 @@
           <path d="M7 5v22M16 5v22M25 5v22M5 7h22M5 16h22M5 25h22" />
         </svg>
         <span>LATTICE</span>
-        <span class="version">v0.1</span>
+        <span class="version">v0.2.0</span>
       </a>
       <nav aria-label="主要导航">
         <a href="#features">功能</a>
@@ -30,7 +30,7 @@
         <div class="hero-copy">
           <p class="eyebrow"><span></span> LOCAL-FIRST · OPEN SOURCE</p>
           <h1>把知识库<br />留在终端里。</h1>
-          <p class="lede">Lattice 是一款受 Obsidian 启发的终端 Markdown 工具。普通文件夹就是 Vault，编辑、预览、链接和整理都在熟悉的命令行里完成。</p>
+          <p class="lede">Lattice 是一款受 Obsidian 启发的终端 Markdown 工具。普通文件夹就是 Vault；编辑、搜索、双向链接与安全整理，都在熟悉的命令行里完成。</p>
           <div class="hero-actions" id="install">
             <button class="install-command" type="button" data-copy="npm install -g lattice-tui" aria-label="复制 npm 安装命令">
               <span class="prompt">$</span>
@@ -39,10 +39,13 @@
             </button>
             <a class="text-link github-link" href="https://github.com/wenwenba/Lattice" target="_blank" rel="noreferrer"><iconify-icon icon="lattice:github" aria-hidden="true"></iconify-icon> 查看源代码 <span>↗</span></a>
           </div>
-          <p class="run-hint">安装后直接运行 <code>lattice</code> · 自动创建并记住 Vault</p>
+          <p class="run-hint">安装后直接运行 <code>lattice</code> · 自动创建并记住 Vault · <a href="https://github.com/wenwenba/Lattice/releases/tag/v0.2.0">查看 v0.2.0 更新</a></p>
         </div>
 
-        <div id="lattice-demo" class="terminal-demo-mount" aria-label="Lattice Web 交互演示"></div>
+        <div class="demo-column">
+          <div id="lattice-demo" class="terminal-demo-mount" aria-label="Lattice Web 交互演示"></div>
+          <p class="demo-note">浏览器演示展示核心编辑流程；搜索 2.0、双向链接与回收站请安装 CLI 体验。</p>
+        </div>
       </section>
 
       <section class="manifesto" aria-label="产品原则">
@@ -53,7 +56,7 @@
         <div class="section-heading">
           <p class="eyebrow"><span></span> BUILT FOR FLOW</p>
           <h2>专注记录，不切换语境。</h2>
-          <p>从文件管理到实时预览，Lattice 把常用知识库动作收进同一个终端工作区。</p>
+          <p>从实时预览到全文检索、知识关联和可恢复删除，Lattice 把常用知识库动作收进同一个终端工作区。</p>
         </div>
         <div class="feature-grid">
           <article class="feature feature-wide">
@@ -69,23 +72,35 @@
           <article class="feature">
             <div class="feature-index"><span>02</span><iconify-icon icon="lattice:folder" aria-hidden="true"></iconify-icon></div>
             <h3>普通目录就是 Vault</h3>
-            <p>创建、重命名、移动、导入与删除都在 CLI 内完成。没有专有数据库，也没有迁移成本。</p>
+            <p>创建、重命名、移动与导入都在 CLI 内完成。笔记始终是普通 Markdown 文件，没有专有数据库。</p>
             <div class="path-card"><span>~/notes/</span><strong>Projects/Launch.md</strong></div>
           </article>
           <article class="feature">
             <div class="feature-index"><span>03</span><iconify-icon icon="lattice:link" aria-hidden="true"></iconify-icon></div>
-            <h3>链接、图片与反向链接</h3>
-            <p>支持 Wiki Link、可点击超链接、Vault 内文件选择和剪贴板图片。附件跟随文档管理。</p>
+            <h3>双向链接，把笔记连起来</h3>
+            <p>输入 <code>[[</code> 自动补全笔记；查看带上下文的反向链接，检查失效链接。重命名或移动笔记时同步更新指向它的 Wiki 链接。</p>
             <div class="link-cloud" aria-hidden="true"><span>Welcome</span><i></i><span>Roadmap</span><i></i><span>随记</span></div>
           </article>
+          <article class="feature">
+            <div class="feature-index"><span>04</span><iconify-icon icon="lattice:search" aria-hidden="true"></iconify-icon></div>
+            <h3>搜索 2.0，找到所需上下文</h3>
+            <p>全文结果显示命中片段与高亮；支持短语、模糊标题，以及标签、路径、链接、日期筛选和排序。</p>
+            <div class="path-card"><span>/search</span><strong>"发布计划" tag:project sort:recent</strong></div>
+          </article>
+          <article class="feature">
+            <div class="feature-index"><span>05</span><iconify-icon icon="lattice:trash" aria-hidden="true"></iconify-icon></div>
+            <h3>删除可恢复，到期自动清理</h3>
+            <p><code>/delete</code> 先移入回收站，<code>/trash</code> 可恢复。保留期可选 7、30 或 90 天，默认 30 天；运行时定期清理，关闭后在下次启动时清理。</p>
+            <div class="path-card"><span>.lattice/trash/</span><strong>可恢复 · 默认保留 30 天</strong></div>
+          </article>
           <article class="feature feature-command">
-            <div class="feature-index"><span>04</span><iconify-icon icon="lattice:command" aria-hidden="true"></iconify-icon></div>
+            <div class="feature-index"><span>06</span><iconify-icon icon="lattice:command" aria-hidden="true"></iconify-icon></div>
             <h3>一个斜杠，调用所有动作</h3>
             <p>命令面板遵循 Claude Code 式输入体验，避开系统快捷键冲突，并支持中文界面。</p>
             <div class="command-list" aria-hidden="true">
               <div class="chosen"><code>/jot</code><span>快速记录随记</span></div>
-              <div><code>/search</code><span>搜索 Vault</span></div>
-              <div><code>/summarize</code><span>AI 整理与汇总</span></div>
+              <div><code>/search</code><span>搜索与筛选 Vault</span></div>
+              <div><code>/trash</code><span>恢复删除的文件</span></div>
             </div>
           </article>
         </div>

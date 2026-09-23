@@ -9,7 +9,7 @@ import { loadSettings, storeSettings } from '../src/settings.js';
 it.each(['macos', 'windows', 'linux'] as const)('routes application actions only through slash commands on %s', async keymap => {
   const root = await mkdtemp(join(tmpdir(), 'lattice-slash-only-'));
   await writeFile(join(root, 'One.md'), '# One');
-  await storeSettings(root, { autoSave: false, theme: 'lattice', language: 'en' });
+  await storeSettings(root, { autoSave: false, theme: 'lattice', language: 'en', trashRetentionDays: 30 });
   const result = await render(App, { columns: 100, rows: 24, props: { vaultPath: root, keymap } });
   try {
     await vi.waitFor(() => expect(result.lastFrame()).toContain(' One'));
@@ -43,9 +43,9 @@ it('keeps q as the browse-mode quit shortcut', async () => {
 it('ignores removed shortcut fields from older settings files', async () => {
   const root = await mkdtemp(join(tmpdir(), 'lattice-settings-migration-'));
   try {
-    await storeSettings(root, { autoSave: true, theme: 'nord', language: 'en' });
+    await storeSettings(root, { autoSave: true, theme: 'nord', language: 'en', trashRetentionDays: 30 });
     const path = join(root, '.lattice/settings.json');
     await writeFile(path, JSON.stringify({ autoSave: false, theme: 'dracula', leader: 'g', applicationKeys: true }));
-    expect(await loadSettings(root)).toEqual({ autoSave: false, theme: 'dracula', language: 'en' });
+    expect(await loadSettings(root)).toEqual({ autoSave: false, theme: 'dracula', language: 'en', trashRetentionDays: 30 });
   } finally { await rm(root, { recursive: true, force: true }); }
 });

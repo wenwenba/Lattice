@@ -30,8 +30,9 @@ export type AppMode =
   | "commands"
   | "pick-file"
   | "confirm-delete"
+  | "trash"
   | "confirm-quit";
-export type MainView = "preview" | "backlinks" | "help";
+export type MainView = "preview" | "backlinks" | "links" | "help";
 export type FocusPane = "sidebar" | "main";
 
 export interface StyledSegment {

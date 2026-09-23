@@ -12,6 +12,7 @@ const commandChinese: Record<string, string> = {
   'Move file or folder': '移动文件或文件夹', 'Import local file or folder': '导入本地文件或文件夹', Settings: '设置',
   'New note': '新建笔记', 'New folder': '新建文件夹', 'Rename selected': '重命名所选项目',
   'Delete selected file or folder': '删除所选文件或文件夹', 'Edit / preview': '编辑 / 预览', 'Search vault': '搜索 Vault',
+  'Trash and restore': '回收站与恢复', 'Link health': '链接检查', Backlinks: '反向链接',
   'Reload vault': '重新加载 Vault', 'Keyboard help': '键盘帮助', Quit: '退出',
 };
 
@@ -20,6 +21,7 @@ const slashChinese: Record<string, [string, string]> = {
   'bullet-list': ['无序列表', '开始无序列表'], 'numbered-list': ['有序列表', '开始有序列表'], task: ['任务', '插入未完成任务'],
   quote: ['引用', '插入引用块'], code: ['代码块', '插入围栏代码块'], table: ['表格', '插入两列表格'],
   'wiki-link': ['Wiki 链接', '链接另一篇笔记'], 'file-link': ['Vault 文件链接', '选择 Vault 内的文件'], image: ['图片', '插入 Vault 图片'],
+  'extract-note': ['提取为笔记', '将选中文字变成链接笔记'],
   callout: ['提示块', '插入 Obsidian 风格提示'], divider: ['分隔线', '插入水平分隔线'], save: ['保存笔记', '保存当前草稿'],
 };
 

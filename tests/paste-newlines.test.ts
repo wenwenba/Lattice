@@ -24,7 +24,7 @@ it('preserves literal escape sequences, question marks, whitespace and non-newli
 it.each(['terminal', 'clipboard'] as const)('pastes %s newlines as real lines, supports undo/redo and saves LF', async source => {
   const root = await mkdtemp(join(tmpdir(), 'lattice-paste-newlines-'));
   await writeFile(join(root, 'One.md'), 'original');
-    await storeSettings(root, { autoSave: false, theme: 'lattice', language: 'en' });
+    await storeSettings(root, { autoSave: false, theme: 'lattice', language: 'en', trashRetentionDays: 30 });
   const payload = '中文\r\r第二行\r\n第三行\u2028第四行\u2029末行\v\n';
   const expected = '中文\n\n第二行\n第三行\n第四行\n末行\n\n';
   const spy = vi.spyOn(clipboard, 'readClipboard').mockResolvedValue({ text: payload });

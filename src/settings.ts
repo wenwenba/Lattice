@@ -7,14 +7,16 @@ export const themes = {
   dracula: { name: 'Dracula', background: '#282a36', foreground: '#f8f8f2', muted: '#a5a8c5', border: '#44475a', accent: '#bd93f9', folder: '#f1fa8c', note: '#8be9fd', image: '#ff79c6' },
   light: { name: 'Paper', background: '#faf8f2', foreground: '#292d35', muted: '#596273', border: '#c6cbd3', accent: '#476b91', folder: '#8a5a18', note: '#346b8c', image: '#864879' },
 } as const;
-export type Settings = { autoSave: boolean; theme: keyof typeof themes; language: Language };
-export const defaultSettings: Settings = { autoSave: true, theme: 'lattice', language: 'en' };
+export const trashRetentionDays = [7, 30, 90] as const;
+export type Settings = { autoSave: boolean; theme: keyof typeof themes; language: Language; trashRetentionDays: typeof trashRetentionDays[number] };
+export const defaultSettings: Settings = { autoSave: true, theme: 'lattice', language: 'en', trashRetentionDays: 30 };
 export async function loadSettings(root: string): Promise<Settings> {
   try {
     const value = JSON.parse(await readFile(join(root, '.lattice', 'settings.json'), 'utf8'));
     return { autoSave: typeof value?.autoSave === 'boolean' ? value.autoSave : true,
       theme: value && Object.hasOwn(themes, value.theme) ? value.theme : 'lattice',
-      language: value && Object.hasOwn(languages, value.language) ? value.language : 'en' };
+      language: value && Object.hasOwn(languages, value.language) ? value.language : 'en',
+      trashRetentionDays: trashRetentionDays.includes(value?.trashRetentionDays) ? value.trashRetentionDays : 30 };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { ...defaultSettings };
     throw error;

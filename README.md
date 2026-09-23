@@ -14,8 +14,8 @@ Lattice is an Obsidian-inspired Markdown knowledge base that lives entirely in t
 - Native Kitty image previews with responsive sizing and scrolling; colour thumbnails on other terminals
 - Multiline editor with mouse positioning/drag selection, clipboard copy/cut, undo/redo and atomic saves
 - In-note find and replace with cyclic matching, replace-current/replace-all actions and undo support
-- Full-vault title/content search
-- Obsidian-style `[[wiki links]]`, link navigation and backlinks
+- Full-vault search with snippets, highlighting, fuzzy title matching, phrases, filters and sorting
+- Obsidian-style `[[wiki links]]`, editor completion, link navigation, contextual backlinks and broken-link checks
 - Tag extraction, nested folders, command palette and unsaved-change protection
 - Deterministic tests for Markdown, editing and vault behavior
 
@@ -31,8 +31,11 @@ The primary action entry is now a persistent, bordered input at the bottom of th
 | `/settings` | Open preferences |
 | `/import`, `/move` | Import or move files/folders |
 | `/new`, `/folder`, `/rename` | Create or rename entries |
-| `/delete` | Delete the selected Markdown file or folder after confirmation |
-| `/search` | Search the vault |
+| `/delete` | Move the selected Markdown file or folder to recoverable Trash after confirmation |
+| `/trash` | Browse and restore deleted files or folders |
+| `/links` | Check unresolved Wiki links |
+| `/backlinks` | Show references to the current note with source lines |
+| `/search` | Search the vault with filters and sorting |
 | `/help`, `/quit` | Help and quit |
 
 While editing a document, `/save` saves the draft and `/file` or `/image` inserts a Vault attachment. Escape returns to browse; if the Markdown quick-insert menu is open, the first Escape closes that menu. Then type `/` to operate the bottom command input. Other Markdown slash insertions, such as `/code`, remain editor-only. Unsaved content and the current document are preserved when opening or cancelling the command menu. Application actions have no prefix, function-key or Command-key alternatives; browse mode retains `e` for edit and `q` for quit.
@@ -86,13 +89,13 @@ Website: [wenwenba.github.io/Lattice](https://wenwenba.github.io/Lattice/) · Mi
 
 Lattice uses Nerd Font icons directly. Configure a Nerd Font Mono in your terminal before running the CLI; Lattice does not install or change terminal fonts. The website demo embeds only the required glyphs, and folder, note and image icons use distinct colors tuned for every built-in theme.
 
-Use `/move` for the full-width three-step picker: choose source, choose destination, confirm move. Type to search, use arrows or PageUp/PageDown to navigate, Home/End to jump, and Ctrl+U to clear search. The list adapts to window height and keeps the selection visible. Enter advances; the last Enter confirms the displayed source/destination. `/ (Vault root)` moves it back to the root. Escape goes back or cancels. Name conflicts are rejected without overwriting; a folder cannot move inside itself. Save unsaved edits before moving. Markdown-managed images use the existing rename migration; arbitrary inbound links are not rewritten.
+Use `/move` for the full-width three-step picker: choose source, choose destination, confirm move. Type to search, use arrows or PageUp/PageDown to navigate, Home/End to jump, and Ctrl+U to clear search. The list adapts to window height and keeps the selection visible. Enter advances; the last Enter confirms the displayed source/destination. `/ (Vault root)` moves it back to the root. Escape goes back or cancels. Name conflicts are rejected without overwriting; a folder cannot move inside itself. Save unsaved edits before moving. Markdown-managed images use the existing rename migration. Resolvable inbound Wiki links are updated to the moved note path; ordinary Markdown links are not rewritten.
 
 Use `/import` after selecting the destination folder in the vault (selecting a note uses its parent folder), then enter or paste a local source path and press Enter. Folders are copied recursively, originals are preserved, and name conflicts get numeric suffixes. Symbolic links/special files and copying a folder into its own descendants are rejected. Paths refer to the machine running Lattice, including when running over SSH.
 
 The import screen shows the destination before copying. Enter one path at a time; press Enter (`↩` on macOS) to import, Escape (`⎋`) to cancel, or Ctrl+U (`⌃U`) to clear the path. If dragging from Finder inserts a path into your terminal, you can use it in this field: check that it is a plain path, removing shell escape backslashes if necessary. Dragging does not select a destination tree node; the previously selected vault directory remains the target.
 
-Use `/settings`. Use ↑/↓ to choose a setting, ←/→ or Enter to change it, and Esc to return. Auto save is on by default and saves after one second without typing; `/save` remains available inside the editor. Failed saves leave the draft intact and report an error. Available themes are Lattice, Nord, Dracula and Paper (light). Interface languages are English and Simplified Chinese; translated command descriptions keep the same stable slash names. Changes apply immediately and persist per vault in `.lattice/settings.json`, hidden from the navigator.
+Use `/settings`. Use ↑/↓ to choose a setting, ←/→ or Enter to change it, and Esc to return. Auto save is on by default and saves after one second without typing; `/save` remains available inside the editor. Failed saves leave the draft intact and report an error. Available themes are Lattice, Nord, Dracula and Paper (light). Interface languages are English and Simplified Chinese; translated command descriptions keep the same stable slash names. Trash retention defaults to 30 days and can be set to 7, 30 or 90 days. Changes apply immediately and persist per vault in `.lattice/settings.json`, hidden from the navigator.
 
 Every selectable list wraps with ↑/↓: pressing ↑ on its first item selects the last item, and pressing ↓ on its last item selects the first. PageUp/PageDown and Home/End continue to stop at list boundaries.
 
@@ -120,7 +123,11 @@ Every selectable list wraps with ↑/↓: pressing ↑ on its first item selects
 
 Lattice reads and writes Markdown notes and image attachments inside the selected vault. Note saves are written to a temporary sibling and renamed into place, reducing the risk of a partial file if a write is interrupted. Clipboard access is local and only happens when explicitly copying, cutting or pasting.
 
-When creating a note or folder, `/` creates nested paths such as `Projects/2026/Ideas`. While renaming, `Ctrl+U` clears the current name. `/delete` operates on the selected Markdown file or folder and always requires confirmation. Folder deletion is recursive, so the confirmation explicitly warns that all contents will be removed. Deleting a note does not automatically delete its managed attachment directory because another note may still reference those files.
+When creating a note or folder, `/` creates nested paths such as `Projects/2026/Ideas`. While renaming, `Ctrl+U` clears the current name. `/delete` moves the selected Markdown file or folder into `.lattice/trash` after confirmation. Use `/trash`, ↑/↓ and Enter to restore. A conflict at the original path receives a ` (restored 2)` suffix rather than overwriting the current file. Moving a folder to Trash includes its contents. Deleting a note leaves its managed attachment directory in place because another note may reference those files. Expired Trash entries are permanently removed when Lattice starts, when `/trash` opens, and hourly while Lattice runs. Lattice does not run a background process while closed; an entry that expires while it is closed is removed on the next launch. Permanent removal cannot be undone from Lattice.
+
+Use `/search` to filter by words or a quoted phrase. Results show a matching line and highlight the first match. Add `tag:name`, `path:folder`, `link:target`, `before:YYYY-MM-DD`, or `after:YYYY-MM-DD`; combine filters with words. `sort:recent` orders by file modification time, `sort:title` by title, and `sort:relevance` restores the default. A close spelling in the title can match even when the text does not. Search reads the currently loaded Vault; use `/reload` after external file changes.
+
+While editing, type `[[` to choose a note. ↑/↓ selects a suggestion and Enter or Tab inserts its path. If no note matches the typed name, Enter creates it. Escape closes the suggestions without removing the text. Select text and use the editor's `/extract-note` command to move it into a new Markdown note and replace the selection with a Wiki link. Use `/links` to list unresolved or ambiguous Wiki links. Frontmatter `aliases: [name]` and YAML list aliases resolve as link targets. In browse mode, Tab focuses the note, `[`/`]` selects a Wiki link, and Enter follows it; the backlinks view shows the source line for each reference.
 
 In the editor, `/` opens a searchable quick-insert menu. For example, type `/code`, `/table`, `/task`, `/link`, or `/callout`, then press `Enter` or `Tab` to insert the selected Markdown structure. Use `/file` to open the in-terminal Vault file selector, or `/save` to save without leaving the editor. Type to filter, use `↑`/`↓` to choose, and press `Enter` to insert a path relative to the current note.
 

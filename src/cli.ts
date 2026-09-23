@@ -2,7 +2,7 @@ import { homedir } from "node:os";
 import { posix, win32 } from "node:path";
 import type { Keymap } from "./shortcuts.js";
 
-export const LATTICE_VERSION = "0.1.5";
+export const LATTICE_VERSION = "0.2.0";
 
 export interface CliOptions {
   vaultPath?: string;

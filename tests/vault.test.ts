@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
@@ -107,5 +107,52 @@ describe("Vault", () => {
     await expect(vault.deleteEntry("One.md", "folder")).rejects.toThrow("not a folder");
     await expect(vault.deleteEntry("", "folder")).rejects.toThrow("root");
     await expect(vault.deleteEntry("../outside.md", "note")).rejects.toThrow("outside");
+  });
+
+  it('restores deleted notes without overwriting a newer file', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'lattice-trash-')); temporaryRoots.push(root);
+    const vault = new Vault(root);
+    await writeFile(join(root, 'One.md'), '# Original');
+    const removed = await vault.deleteEntry('One.md', 'note');
+    expect((await vault.listTrash()).map(entry => entry.id)).toEqual([removed.id]);
+    await writeFile(join(root, 'One.md'), '# New');
+    expect(await vault.restoreEntry(removed.id)).toBe('One (restored 2).md');
+    expect(await readFile(join(root, 'One.md'), 'utf8')).toBe('# New');
+    expect(await readFile(join(root, 'One (restored 2).md'), 'utf8')).toBe('# Original');
+    expect(await vault.listTrash()).toEqual([]);
+  });
+
+  it('permanently purges only trash entries whose retention period expired', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'lattice-trash-retention-')); temporaryRoots.push(root);
+    const vault = new Vault(root);
+    const now = Date.UTC(2026, 8, 23);
+    await mkdir(join(root, 'Old', 'nested'), { recursive: true });
+    await writeFile(join(root, 'Old', 'nested', 'data.txt'), 'old data');
+    await writeFile(join(root, 'Fresh.md'), '# Fresh');
+    const old = await vault.deleteEntry('Old', 'folder');
+    const fresh = await vault.deleteEntry('Fresh.md', 'note');
+    const metadata = (id: string) => join(root, '.lattice', 'trash', id, 'meta.json');
+    await writeFile(metadata(old.id), JSON.stringify({ ...old, deletedAt: now - 30 * 86_400_000 }));
+    await writeFile(metadata(fresh.id), JSON.stringify({ ...fresh, deletedAt: now - 29 * 86_400_000 }));
+    await expect(vault.purgeExpiredTrash(0, now)).rejects.toThrow('at least one day');
+    expect((await vault.purgeExpiredTrash(30, now)).map(entry => entry.id)).toEqual([old.id]);
+    expect((await vault.listTrash()).map(entry => entry.id)).toEqual([fresh.id]);
+    await expect(readFile(join(root, '.lattice', 'trash', old.id, 'payload', 'nested', 'data.txt'))).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(await vault.restoreEntry(fresh.id)).toBe('Fresh.md');
+    expect(await readFile(join(root, 'Fresh.md'), 'utf8')).toBe('# Fresh');
+  });
+
+  it('updates inbound wiki links when a note or folder moves', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'lattice-rename-links-')); temporaryRoots.push(root);
+    const vault = new Vault(root);
+    await mkdir(join(root, 'Folder'));
+    await writeFile(join(root, 'Folder', 'Target.md'), '# Target');
+    await writeFile(join(root, 'Folder', 'Inside.md'), '# Inside\n[[../Source]]');
+    await writeFile(join(root, 'Source.md'), '# Source\n[[Target#Section|label]]\n`[[Target]]`\n```\n[[Target]]\n```');
+    await vault.renameEntry('Folder', 'Moved');
+    expect(await readFile(join(root, 'Source.md'), 'utf8')).toContain('[[Moved/Target#Section|label]]');
+    expect(await readFile(join(root, 'Source.md'), 'utf8')).toContain('`[[Target]]`');
+    expect(await readFile(join(root, 'Moved', 'Inside.md'), 'utf8')).toContain('[[Source]]');
+    expect((await vault.loadNotes()).find(note => note.id === 'Source')?.links).toEqual(['Moved/Target']);
   });
 });

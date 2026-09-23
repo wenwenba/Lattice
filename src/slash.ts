@@ -7,7 +7,7 @@ export interface SlashCommand {
   keywords: string;
   insertion: string;
   cursorOffset?: number;
-  action?: "pick-vault-file" | "pick-vault-image" | "save-note";
+  action?: "pick-vault-file" | "pick-vault-image" | "save-note" | "extract-note";
 }
 
 export const SLASH_COMMANDS: readonly SlashCommand[] = [
@@ -21,6 +21,7 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
   command("code", "Code block", "Fenced code block", "code fence snippet", "```\n\n```", 4),
   command("table", "Table", "Two-column Markdown table", "table columns", "| Column | Column |\n| --- | --- |\n| Value | Value |"),
   command("wiki-link", "Wiki link", "Link another note", "link wiki backlink", "[[]]", 2),
+  command("extract-note", "Extract to note", "Turn selected text into a linked note", "extract selection note link", "", undefined, "extract-note"),
   command("file-link", "Vault file link", "Choose a file inside this vault", "file link attachment vault browse picker", "", undefined, "pick-vault-file"),
   command("image", "Image", "Insert a vault image", "image img picture photo 图片", "", undefined, "pick-vault-image"),
   command("callout", "Callout", "Obsidian-style info callout", "callout info note", "> [!note]\n> "),
@@ -32,7 +33,7 @@ export function filterSlashCommands(query: string): SlashCommand[] {
   const terms = query.toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
   if (!terms.length) return [...SLASH_COMMANDS];
   return SLASH_COMMANDS.filter((item) => {
-    const haystack = `${item.label} ${item.keywords}`.toLocaleLowerCase();
+    const haystack = `${item.id} ${item.label} ${item.keywords}`.toLocaleLowerCase();
     return terms.every((term) => haystack.includes(term));
   });
 }

@@ -1,4 +1,5 @@
 import type { RenderLine, StyledSegment } from "./types.js";
+import { wikiReferences } from './wiki.js';
 
 const WIKI_LINK = /\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|([^\]]+))?\]\]/g;
 const MARKDOWN_LINK = /\[([^\]]+)\]\(([^)]+)\)/g;
@@ -42,7 +43,7 @@ const KEYWORDS: Record<string, Set<string>> = {
 };
 
 export function extractLinks(content: string): string[] {
-  return unique([...content.matchAll(WIKI_LINK)].map((match) => match[1]?.trim()).filter(Boolean) as string[]);
+  return unique(wikiReferences(content).map(link => link.target));
 }
 
 export function extractTags(content: string): string[] {

@@ -233,7 +233,7 @@ describe("editing workspace", () => {
       await vi.waitFor(() => expect(result.lastFrame()).toContain('AUTO SAVE · [ OFF ]'));
       await result.stdin.write('\x1b[B\x1b[C');
       await vi.waitFor(() => expect(result.lastFrame()).toContain('THEME · Nord'));
-      expect(JSON.parse(await readFile(join(root, '.lattice/settings.json'), 'utf8'))).toEqual({ autoSave: false, theme: 'nord', language: 'en' });
+      expect(JSON.parse(await readFile(join(root, '.lattice/settings.json'), 'utf8'))).toEqual({ autoSave: false, theme: 'nord', language: 'en', trashRetentionDays: 30 });
       await result.stdin.write('\x1b');
       expect(result.lastFrame()).toContain('One · thumbnail');
       await result.stdin.write('/edit\r');

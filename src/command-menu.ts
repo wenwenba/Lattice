@@ -3,6 +3,7 @@ const names: Record<string, string> = {
   'Move file or folder': 'move', 'Import local file or folder': 'import', Settings: 'settings',
   'New note': 'new', 'New folder': 'folder', 'Rename selected': 'rename',
   'Delete selected file or folder': 'delete', 'Edit / preview': 'edit', 'Search vault': 'search',
+  'Trash and restore': 'trash', 'Link health': 'links', 'Backlinks': 'backlinks',
   'Reload vault': 'reload', 'Keyboard help': 'help', Quit: 'quit',
 };
 export function commandName(label: string): string { return names[label] ?? label.toLowerCase().replaceAll(' ', '-'); }

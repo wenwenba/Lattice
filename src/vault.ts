@@ -1,11 +1,16 @@
-import { copyFile, mkdir, readdir, readFile, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
+import { copyFile, lstat, mkdir, readdir, readFile, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, relative, resolve, sep } from "node:path";
+import { randomUUID } from 'node:crypto';
 import { extractLinks, extractTags, noteTitle } from "./markdown.js";
 import type { Note, VaultFile } from "./types.js";
 import { attachmentDirectory, assertRealInside, storeClipboardImage, isAttachmentDirectory } from "./attachments.js";
 import { markdownVaultFileLink, resolveLinkTarget } from "./links.js";
 import { renderMarkdown } from "./markdown.js";
 import { fileURLToPath } from "node:url";
+import { searchNotes, type SearchHit } from './search.js';
+import { resolveWikiNote, rewriteWikiTargets, wikiReferences } from './wiki.js';
+
+export type TrashEntry = { id: string; relativePath: string; kind: 'note' | 'folder'; deletedAt: number };
 
 export class Vault {
   readonly root: string;
@@ -113,12 +118,25 @@ export class Vault {
     await assertRealInside(this.root, existingParent);
     await mkdir(dirname(target), { recursive: true });
     await assertRealInside(this.root, dirname(target));
+    const oldNotes = await this.loadNotes();
+    const sourceRelative = relative(this.root, source).split(sep).join('/');
+    const targetRelative = relative(this.root, target).split(sep).join('/');
+    const moved = new Map(oldNotes.filter(note => note.relativePath === sourceRelative || (sourceInfo.isDirectory() && note.relativePath.startsWith(`${sourceRelative}/`)))
+      .map(note => [note.id, `${targetRelative}${note.relativePath.slice(sourceRelative.length)}`.replace(/\.md$/i, '')]));
+    const changed = oldNotes.flatMap(note => {
+      const targets = new Map<number, string>();
+      for (const [index, link] of wikiReferences(note.content).entries()) {
+        const linked = resolveWikiNote(oldNotes, link.target, note);
+        if (linked && (moved.has(linked.id) || (moved.has(note.id) && /^\.\.?\//.test(link.target)))) targets.set(index, moved.get(linked.id) ?? linked.id);
+      }
+      return targets.size ? [{ note, targets }] : [];
+    });
     // Migrate only managed image references. Keep original attachments because
     // another note may still link to them; never silently delete shared assets.
     const content = sourceInfo.isFile() && /\.md$/i.test(source) ? await readFile(source, "utf8") : undefined;
     await rename(source, target);
-    if (content !== undefined) {
-      try {
+    try {
+      if (content !== undefined) {
         const managed = attachmentDirectory(source);
         const replacements = new Map<string, string>();
         const targets = renderMarkdown(content).flatMap((line) => line.segments.flatMap((segment) => segment.image ? [segment.image.target] : []));
@@ -136,50 +154,109 @@ export class Vault {
           const updated = rewriteManagedImages(content, replacements);
           await this.save(await this.readNote(target), updated);
         }
-      } catch (error) {
-        // The note itself is restored; any newly copied images remain recoverable.
-        await rename(target, source);
-        throw error;
       }
+      for (const item of changed) {
+        const path = moved.has(item.note.id)
+          ? resolve(this.root, `${targetRelative}${item.note.relativePath.slice(sourceRelative.length)}`) : item.note.path;
+        const current = await this.readNote(path);
+        const references = wikiReferences(current.content);
+        const replacements = new Map([...item.targets].flatMap(([index, target]) => references[index] ? [[references[index]!.start, target] as const] : []));
+        await this.save(current, rewriteWikiTargets(current.content, replacements));
+      }
+    } catch (error) {
+      await rename(target, source);
+      for (const note of oldNotes) {
+        const currentPath = note.path;
+        if (changed.some(item => item.note.id === note.id) || (content !== undefined && note.path === source)) {
+          await this.save({ ...note, path: currentPath }, note.content);
+        }
+      }
+      throw error;
     }
-    return relative(this.root, target).split(sep).join("/");
+    return targetRelative;
   }
 
-  async deleteEntry(relativePath: string, kind: "note" | "folder"): Promise<void> {
+  async deleteEntry(relativePath: string, kind: "note" | "folder"): Promise<TrashEntry> {
     const target = this.assertInside(resolve(this.root, relativePath));
     if (target === this.root) throw new Error("The vault root cannot be deleted");
+    if (target === resolve(this.root, '.lattice') || target.startsWith(`${resolve(this.root, '.lattice')}${sep}`)) throw new Error('Lattice metadata cannot be deleted');
     await assertRealInside(this.root, target);
     const info = await stat(target);
     if (kind === "folder" ? !info.isDirectory() : !info.isFile() || extname(target).toLocaleLowerCase() !== ".md") {
       throw new Error(`Selected path is not a ${kind === "folder" ? "folder" : "Markdown file"}`);
     }
-    await rm(target, { recursive: kind === "folder" });
+    const entry: TrashEntry = { id: randomUUID(), relativePath: relative(this.root, target).split(sep).join('/'), kind, deletedAt: Date.now() };
+    const location = resolve(this.root, '.lattice', 'trash', entry.id);
+    await mkdir(location, { recursive: true });
+    await writeFile(resolve(location, 'meta.json'), JSON.stringify(entry), { flag: 'wx' });
+    await rename(target, resolve(location, 'payload'));
+    return entry;
   }
 
-  findLinkedNote(notes: Note[], target: string): Note | undefined {
-    const normalized = target.replace(/\\/g, "/").replace(/\.md$/i, "").toLocaleLowerCase();
-    return notes.find((note) => note.id.toLocaleLowerCase() === normalized)
-      ?? notes.find((note) => note.id.split("/").at(-1)?.toLocaleLowerCase() === normalized)
-      ?? notes.find((note) => note.title.toLocaleLowerCase() === normalized);
+  async listTrash(): Promise<TrashEntry[]> {
+    const folder = resolve(this.root, '.lattice', 'trash');
+    let ids: string[];
+    try { ids = await readdir(folder); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []; throw error; }
+    const entries = await Promise.all(ids.map(async id => {
+      try {
+        const entry = JSON.parse(await readFile(resolve(folder, id, 'meta.json'), 'utf8')) as TrashEntry;
+        await stat(resolve(folder, id, 'payload'));
+        return entry.id === id && /^[\da-f-]{36}$/i.test(id) && Number.isFinite(entry.deletedAt)
+          && (entry.kind === 'note' || entry.kind === 'folder') && typeof entry.relativePath === 'string' ? entry : undefined;
+      } catch { return undefined; }
+    }));
+    return entries.filter((entry): entry is TrashEntry => !!entry).sort((a, b) => b.deletedAt - a.deletedAt);
+  }
+
+  async purgeExpiredTrash(retentionDays: number, now = Date.now()): Promise<TrashEntry[]> {
+    if (!Number.isSafeInteger(retentionDays) || retentionDays < 1) throw new Error('Trash retention must be at least one day');
+    const cutoff = now - retentionDays * 24 * 60 * 60 * 1000;
+    const expired = (await this.listTrash()).filter(entry => entry.deletedAt <= cutoff);
+    const removed: TrashEntry[] = [];
+    for (const entry of expired) {
+      const location = resolve(this.root, '.lattice', 'trash', entry.id);
+      const info = await lstat(location);
+      if (!info.isDirectory() || info.isSymbolicLink()) continue;
+      await rm(location, { recursive: true });
+      removed.push(entry);
+    }
+    return removed;
+  }
+
+  async restoreEntry(id: string): Promise<string> {
+    if (!/^[\da-f-]{36}$/i.test(id)) throw new Error('Invalid trash entry');
+    const location = resolve(this.root, '.lattice', 'trash', id);
+    const entry = JSON.parse(await readFile(resolve(location, 'meta.json'), 'utf8')) as TrashEntry;
+    if (entry.id !== id) throw new Error('Invalid trash entry');
+    let destination = this.assertInside(resolve(this.root, entry.relativePath));
+    let suffix = 2;
+    while (await fileExists(destination)) {
+      const extension = entry.kind === 'note' ? '.md' : '';
+      const stem = entry.relativePath.slice(0, entry.relativePath.length - extension.length);
+      destination = this.assertInside(resolve(this.root, `${stem} (restored ${suffix++})${extension}`));
+    }
+    await mkdir(dirname(destination), { recursive: true });
+    await assertRealInside(this.root, dirname(destination));
+    await rename(resolve(location, 'payload'), destination);
+    await unlink(resolve(location, 'meta.json'));
+    return relative(this.root, destination).split(sep).join('/');
+  }
+
+  findLinkedNote(notes: Note[], target: string, source?: Note): Note | undefined {
+    return resolveWikiNote(notes, target, source);
   }
 
   backlinks(notes: Note[], target: Note): Note[] {
-    return notes.filter((note) => note.links.some((link) => this.findLinkedNote([target], link)?.id === target.id));
+    return notes.filter((note) => note.links.some((link) => this.findLinkedNote(notes, link, note)?.id === target.id));
   }
 
   search(notes: Note[], query: string): Note[] {
-    const terms = query.toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
-    if (!terms.length) return notes;
-    return notes
-      .map((note) => {
-        const title = `${note.title} ${note.relativePath}`.toLocaleLowerCase();
-        const content = note.content.toLocaleLowerCase();
-        const score = terms.reduce((total, term) => total + (title.includes(term) ? 10 : 0) + (content.includes(term) ? 1 : 0), 0);
-        return { note, score };
-      })
-      .filter(({ score }) => score > 0)
-      .sort((a, b) => b.score - a.score || a.note.title.localeCompare(b.note.title))
-      .map(({ note }) => note);
+    return this.searchHits(notes, query).map(hit => hit.note);
+  }
+
+  searchHits(notes: Note[], query: string): SearchHit[] {
+    return searchNotes(notes, query);
   }
 
   private assertInside(path: string): string {

@@ -7,9 +7,11 @@ import folderTreeIcon from '@iconify-icons/lucide/folder-tree';
 import githubIcon from '@iconify-icons/lucide/github';
 import linkIcon from '@iconify-icons/lucide/link';
 import panelsIcon from '@iconify-icons/lucide/panels-top-left';
+import searchIcon from '@iconify-icons/lucide/search';
+import trashIcon from '@iconify-icons/lucide/trash-2';
 import LatticeDemo from './LatticeDemo.vue';
 
-for (const [name, icon] of Object.entries({ command: commandIcon, copy: copyIcon, folder: folderTreeIcon, github: githubIcon, link: linkIcon, panels: panelsIcon })) {
+for (const [name, icon] of Object.entries({ command: commandIcon, copy: copyIcon, folder: folderTreeIcon, github: githubIcon, link: linkIcon, panels: panelsIcon, search: searchIcon, trash: trashIcon })) {
   addIcon(`lattice:${name}`, icon);
 }
 

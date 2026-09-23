@@ -9,14 +9,14 @@ import { resolveEditorShortcut, hasNonShiftModifier, isControlKey, keymapPlatfor
 import { applySlashCommand, filterSlashCommands } from "./slash.js";
 import { buildSearchTree, buildVaultTree, parentFolder, type TreeItem } from "./tree.js";
 import type { AppMode, FocusPane, MainView, Note, StyledSegment, VaultFile, RenderLine } from "./types.js";
-import { Vault } from "./vault.js";
+import { Vault, type TrashEntry } from "./vault.js";
 import { readClipboard, writeClipboardText } from "./clipboard.js";
 import { MOUSE_INPUT, type MouseEvent } from "./mouse.js";
 import type { TuiKey } from "@vue-tui/runtime";
 import { storeClipboardImage } from "./attachments.js";
 import { KITTY_GRAPHICS } from "./graphics.js";
 import { pathToFileURL } from "node:url";
-import { defaultSettings, loadSettings, storeSettings, themes, type Settings } from './settings.js';
+import { defaultSettings, loadSettings, storeSettings, themes, trashRetentionDays, type Settings } from './settings.js';
 import { commandTitle, languages, slashDescription as localizedSlashDescription, slashTitle as localizedSlashTitle, translate } from './i18n.js';
 import { commandName, filterCommands } from './command-menu.js';
 import { importLocal } from './import.js';
@@ -25,6 +25,7 @@ import stringWidth from 'string-width';
 import { loadAIConfig, storeAIConfig, preset, providers, summarize, type AIConfig } from './ai.js';
 import { useFindReplace } from './find-replace.js';
 import { icons, vaultFileKind, type VaultIconKind } from './icons.js';
+import { noteAliases, resolveWikiNote, wikiReferences } from './wiki.js';
 
 const aiConfig = shallowRef<AIConfig>(preset('OpenAI'));
 const aiField = shallowRef(0);
@@ -261,10 +262,16 @@ const ui = (english: string, chinese: string) => translate(settings.value.langua
 const slashTitle = (command: Parameters<typeof localizedSlashTitle>[1]) => localizedSlashTitle(settings.value.language, command);
 const slashDescription = (command: Parameters<typeof localizedSlashDescription>[1]) => localizedSlashDescription(settings.value.language, command);
 const settingsReady = shallowRef(false);
+const retentionLoaded = shallowRef(false);
 const settingIndex = shallowRef(0);
 let settingsReturn: AppMode = 'browse';
 let writingSettings = false;
 let autoSaveTimer: ReturnType<typeof setTimeout> | undefined;
+let trashCleanupTimer: ReturnType<typeof setInterval> | undefined;
+async function cleanupExpiredTrash(): Promise<number> {
+  return (await vault.purgeExpiredTrash(settings.value.trashRetentionDays)).length;
+}
+onUnmounted(() => { if (trashCleanupTimer) clearInterval(trashCleanupTimer); });
 function openSettings(): void {
   settingsReturn = mode.value === 'edit' ? 'edit' : 'browse';
   closeSlashMenu(); mode.value = 'settings'; status.value = ui('Settings', '设置');
@@ -273,20 +280,29 @@ async function handleSettingsInput(event: TuiInputEvent): Promise<void> {
   if (event.type !== 'key' || writingSettings) return;
   const key = event.key.name;
   if (key === 'escape') { mode.value = settingsReturn; status.value = ui('Settings closed', '已关闭设置'); return; }
-  if (key === 'up' || key === 'down') { settingIndex.value = wrapIndex(settingIndex.value, key === 'up' ? -1 : 1, 4); return; }
+  if (key === 'up' || key === 'down') { settingIndex.value = wrapIndex(settingIndex.value, key === 'up' ? -1 : 1, 5); return; }
   if (!['enter', 'left', 'right'].includes(key ?? '')) return;
-  if (settingIndex.value === 3) { openAIConfig(); return; }
+  if (settingIndex.value === 4) { openAIConfig(); return; }
   const next = { ...settings.value };
   if (!settingIndex.value) next.autoSave = !next.autoSave;
   else if (settingIndex.value === 1) {
     const keys = Object.keys(themes) as Settings['theme'][];
     next.theme = keys[(keys.indexOf(next.theme) + (key === 'left' ? -1 : 1) + keys.length) % keys.length]!;
-  } else {
+  } else if (settingIndex.value === 2) {
     const keys = Object.keys(languages) as Settings['language'][];
     next.language = keys[wrapIndex(keys.indexOf(next.language), key === 'left' ? -1 : 1, keys.length)]!;
+  } else {
+    next.trashRetentionDays = trashRetentionDays[wrapIndex(trashRetentionDays.indexOf(next.trashRetentionDays), key === 'left' ? -1 : 1, trashRetentionDays.length)]!;
   }
   writingSettings = true;
-  try { await storeSettings(vault.root, next); settings.value = next; status.value = ui('Settings saved', '设置已保存'); }
+  try {
+    const retentionChanged = next.trashRetentionDays !== settings.value.trashRetentionDays;
+    await storeSettings(vault.root, next); settings.value = next; status.value = ui('Settings saved', '设置已保存');
+    if (retentionChanged && retentionLoaded.value) {
+      const removed = await cleanupExpiredTrash();
+      if (removed) status.value = ui(`Permanently removed ${removed} expired trash entries`, `已永久清理 ${removed} 个过期回收站项目`);
+    }
+  }
   catch (error) { status.value = `${ui('Settings failed', '设置保存失败')}: ${errorMessage(error)}`; }
   finally { writingSettings = false; }
 }
@@ -325,6 +341,11 @@ const commandRows = computed(() => Math.max(1, Math.min(6, Math.floor((viewportH
 const dockHeight = computed(() => commandDock.value ? 3 + (mode.value === 'commands' ? Math.max(1, Math.min(commandRows.value, filteredCommands.value.length)) + 1 : 0) : 0);
 const renameTarget = shallowRef<TreeItem>();
 const deleteTarget = shallowRef<TreeItem>();
+const trashEntries = shallowRef<TrashEntry[]>([]);
+const trashIndex = shallowRef(0);
+const trashBusy = shallowRef(false);
+const trashRows = computed(() => Math.max(1, bodyHeight.value - 4));
+const trashWindowStart = computed(() => Math.max(0, Math.min(trashIndex.value - Math.floor(trashRows.value / 2), trashEntries.value.length - trashRows.value)));
 const scrollOffset = shallowRef(0);
 const editorScroll = shallowRef(0);
 const selectedLinkIndex = shallowRef(0);
@@ -340,6 +361,8 @@ watch(editor, (next, previous) => { if (!replayingHistory) history.record(previo
 const editingNoteId = shallowRef<string>();
 const slashStart = shallowRef<number>();
 const slashIndex = shallowRef(0);
+const wikiIndex = shallowRef(0);
+const wikiDismissed = shallowRef(false);
 let slashOriginal: EditorState | undefined;
 let slashHistoryCheckpoint: ReturnType<typeof history.checkpoint> | undefined;
 const filePickerIndex = shallowRef(0);
@@ -354,7 +377,7 @@ let disposed = false;
 onUnmounted(() => { disposed = true; });
 
 const sidebarWidth = computed(() => Math.max(24, Math.min(38, Math.floor(layout.width.value * 0.3))));
-const showSidebar = computed(() => !['move', 'settings', 'ai-config', 'ai-review'].includes(mode.value) && ((mode.value !== "edit" && !pickingImage.value) || layout.width.value >= 96));
+const showSidebar = computed(() => !['move', 'settings', 'ai-config', 'ai-review', 'trash'].includes(mode.value) && ((mode.value !== "edit" && !pickingImage.value) || layout.width.value >= 96));
 const viewportHeight = computed(() => Number.isFinite(layout.height.value) ? layout.height.value : 24);
 const footerHint = computed(() => {
   if (availableUpdate.value) return ui(`Update available · npm install -g lattice-tui@latest`, `有新版本 · npm install -g lattice-tui@latest`);
@@ -366,6 +389,7 @@ const footerHint = computed(() => {
   if (mode.value === 'ai-config') return ui(`↑↓ field · type replaces · ${enterLabel} next/save · ${escapeLabel} cancel`, `↑↓ 字段 · 输入替换 · ${enterLabel} 下一项/保存 · ${escapeLabel} 取消`);
   if (mode.value === 'ai-review') return aiBusy.value ? ui(`${escapeLabel} cancel request`, `${escapeLabel} 取消请求`) : ui(`↑↓ scroll · ${enterLabel} ${aiResult.value ? 'save copy' : 'send note'} · ${escapeLabel} cancel`, `↑↓ 滚动 · ${enterLabel} ${aiResult.value ? '保存副本' : '发送笔记'} · ${escapeLabel} 取消`);
   if (mode.value === 'move') return moveConfirm.value ? ui(`${enterLabel} confirm · ${escapeLabel} back`, `${enterLabel} 确认 · ${escapeLabel} 返回`) : ui(`↑↓ select · PgUp/PgDn page · ${enterLabel} next · ${escapeLabel} back`, `↑↓ 选择 · PgUp/PgDn 翻页 · ${enterLabel} 下一步 · ${escapeLabel} 返回`);
+  if (mode.value === 'trash') return ui(`↑↓ choose · ${enterLabel} restore · ${escapeLabel} return`, `↑↓ 选择 · ${enterLabel} 恢复 · ${escapeLabel} 返回`);
   if (mode.value === 'import') return ui(`${enterLabel} import · ${escapeLabel} cancel · ${controlKey('U')} clear`, `${enterLabel} 导入 · ${escapeLabel} 取消 · ${controlKey('U')} 清空`);
   if (mode.value !== "edit") return layout.width.value >= 72
     ? ui('e edit · q quit · / commands · /jot · /summarize · /settings', 'e 编辑 · q 退出 · / 命令 · /jot 随记 · /summarize AI 整理 · /settings 设置')
@@ -381,7 +405,17 @@ const bodyHeight = computed(() => {
   return Math.max(3, height - 3 - headerHeight.value - dockHeight.value);
 });
 const visibleRows = computed(() => Math.max(3, bodyHeight.value - 3));
-const displayedNotes = computed(() => vault.search(notes.value, searchFilter.value));
+const searchHits = computed(() => vault.searchHits(notes.value, searchFilter.value));
+const displayedNotes = computed(() => searchHits.value.map(hit => hit.note));
+const selectedSearchHit = computed(() => searchHits.value.find(hit => hit.note.id === activeNoteId.value));
+const searchHighlight = computed(() => {
+  const hit = selectedSearchHit.value;
+  if (!hit?.match) return { before: hit?.snippet ?? '', match: '', after: '' };
+  const index = hit.snippet.toLocaleLowerCase().indexOf(hit.match);
+  return index < 0 ? { before: hit.snippet, match: '', after: '' } : {
+    before: hit.snippet.slice(0, index), match: hit.snippet.slice(index, index + hit.match.length), after: hit.snippet.slice(index + hit.match.length),
+  };
+});
 const sidebarItems = computed(() => searchFilter.value
   ? buildSearchTree(displayedNotes.value)
   : buildVaultTree(notes.value, folders.value, expandedFolders.value));
@@ -420,6 +454,14 @@ const selectedPathRows = computed(() => selectedPath.value && showSidebar.value
 const headerHeight = computed(() => 2 + selectedPathRows.value);
 const activeNote = computed(() => notes.value.find((note) => note.id === activeNoteId.value));
 const activeBacklinks = computed(() => activeNote.value ? vault.backlinks(notes.value, activeNote.value) : []);
+const backlinkContext = computed(() => activeBacklinks.value.map(note => ({ note, lines: wikiReferences(note.content)
+  .filter(link => resolveWikiNote(notes.value, link.target, note)?.id === activeNote.value?.id).map(link => link.line) })));
+const backlinkRows = computed(() => backlinkContext.value.flatMap(({ note, lines }) => [
+  { key: `${note.id}:title`, text: `← ${note.title} · ${note.relativePath}`, title: true },
+  ...lines.slice(0, 2).map((line, index) => ({ key: `${note.id}:${index}`, text: `  ${line}`, title: false })),
+]));
+const brokenLinks = computed(() => notes.value.flatMap(note => wikiReferences(note.content)
+  .filter(link => !resolveWikiNote(notes.value, link.target, note)).map(link => ({ note, link }))));
 const previewContent = computed(() => editingNoteId.value !== undefined && editingNoteId.value === activeNoteId.value
   ? editor.value.content
   : activeNote.value?.content ?? "");
@@ -502,13 +544,30 @@ const slashQuery = computed(() => {
 });
 const slashCommands = computed(() => settings.value.language === 'en' ? filterSlashCommands(slashQuery.value) : filterSlashCommands('').filter(command => {
   const terms = slashQuery.value.toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
-  return terms.every(term => `${command.label} ${command.keywords} ${slashTitle(command)} ${slashDescription(command)}`.toLocaleLowerCase().includes(term));
+  return terms.every(term => `${command.id} ${command.label} ${command.keywords} ${slashTitle(command)} ${slashDescription(command)}`.toLocaleLowerCase().includes(term));
 }));
 const slashWindowStart = computed(() => Math.max(0, slashIndex.value - 4));
 const visibleSlashCommands = computed(() => slashCommands.value.slice(slashWindowStart.value, slashWindowStart.value + 5));
 const slashMenuRows = computed(() => slashStart.value === undefined ? 0 : Math.min(5, slashCommands.value.length) + 2);
+const wikiStart = computed(() => {
+  if (wikiDismissed.value || mode.value !== 'edit' || slashStart.value !== undefined) return -1;
+  const before = editor.value.content.slice(0, editor.value.cursor);
+  const start = before.lastIndexOf('[[');
+  if (start < 0 || start < before.lastIndexOf('\n') || start < before.lastIndexOf(']]')) return -1;
+  const after = editor.value.content.slice(editor.value.cursor);
+  if (after.startsWith(']]') || !before.slice(start + 2).includes(']')) return start;
+  return -1;
+});
+const wikiQuery = computed(() => wikiStart.value < 0 ? '' : editor.value.content.slice(wikiStart.value + 2, editor.value.cursor));
+const wikiCandidates = computed(() => {
+  const query = wikiQuery.value.toLocaleLowerCase().trim();
+  return notes.value.filter(note => note.id !== activeNoteId.value && (!query || `${note.id} ${note.title} ${noteAliases(note.content).join(' ')}`.toLocaleLowerCase().includes(query)));
+});
+const wikiWindowStart = computed(() => Math.max(0, wikiIndex.value - 4));
+const wikiMenuRows = computed(() => wikiStart.value < 0 ? 0 : Math.min(5, wikiCandidates.value.length) + 2);
+watch(wikiQuery, () => { wikiIndex.value = 0; });
 const findPanelRows = computed(() => findMode.value === 'closed' ? 0 : findMode.value === 'find' ? 3 : 5);
-const editorVisibleRows = computed(() => Math.max(3, visibleRows.value - slashMenuRows.value - findPanelRows.value));
+const editorVisibleRows = computed(() => Math.max(3, visibleRows.value - slashMenuRows.value - wikiMenuRows.value - findPanelRows.value));
 const visibleEditorLines = computed(() => allEditorLines.value.slice(editorScroll.value, editorScroll.value + editorVisibleRows.value));
 const editingNote = computed(() => notes.value.find((note) => note.id === editingNoteId.value));
 const isDirty = computed(() => Boolean(editingNote.value && editor.value.content !== editingNote.value.content));
@@ -540,7 +599,7 @@ const commands = computed<Command[]>(() => [
     ['Quick note', quickNote], ['Organize saved note with AI', openAIReview], ['AI model configuration', openAIConfig],
     ['Move file or folder', enterMove], ['Import local file or folder', enterImport], ['Settings', openSettings],
     ['New note', enterCreate], ['New folder', enterCreateFolder], ['Rename selected', enterRename],
-    ['Delete selected file or folder', requestDeleteEntry], ['Edit / preview', enterEdit], ['Search vault', enterSearch],
+    ['Delete selected file or folder', requestDeleteEntry], ['Trash and restore', openTrash], ['Link health', () => showView('links')], ['Backlinks', () => showView('backlinks')], ['Edit / preview', enterEdit], ['Search vault', enterSearch],
     ['Reload vault', reload], ['Keyboard help', () => showView('help')], ['Quit', requestQuit],
   ] as const).map(([label, run]) => ({ label, title: commandTitle(settings.value.language, label), run })),
 ]);
@@ -576,12 +635,25 @@ onMounted(async () => {
   await reload();
   try {
     settings.value = await loadSettings(vault.root);
+    retentionLoaded.value = true;
     if (/^\d+ notes · \d+ folders loaded$/.test(status.value)) {
       status.value = ui(`${notes.value.length} notes · ${folders.value.length} folders loaded`, `已加载 ${notes.value.length} 篇笔记 · ${folders.value.length} 个文件夹`);
     }
   }
   catch (error) { status.value = `${ui('Settings failed', '设置加载失败')}: ${errorMessage(error)}`; }
   settingsReady.value = true;
+  if (retentionLoaded.value) {
+    try {
+      const removed = await cleanupExpiredTrash();
+      if (removed) status.value = ui(`Permanently removed ${removed} expired trash entries`, `已永久清理 ${removed} 个过期回收站项目`);
+    } catch (error) { status.value = `${ui('Trash cleanup failed', '回收站清理失败')}: ${errorMessage(error)}`; }
+    trashCleanupTimer = setInterval(() => {
+      if (disposed || mode.value === 'trash' || trashBusy.value) return;
+      void cleanupExpiredTrash().then(removed => {
+        if (removed && !disposed) status.value = ui(`Permanently removed ${removed} expired trash entries`, `已永久清理 ${removed} 个过期回收站项目`);
+      }).catch(error => { if (!disposed) status.value = `${ui('Trash cleanup failed', '回收站清理失败')}: ${errorMessage(error)}`; });
+    }, 60 * 60 * 1000);
+  }
   try { aiConfig.value = await loadAIConfig(vault.root); }
   catch (error) { status.value = `${ui('AI config failed', 'AI 配置加载失败')}: ${errorMessage(error)}`; }
   const latest = await props.updateCheck;
@@ -596,6 +668,7 @@ useInput(function handleInput(event) {
   if (aiBusy.value) return;
   if (pasting.value || importing.value || moving.value) return;
   if (mode.value === 'move') { void handleMove(event); return; }
+  if (mode.value === 'trash') { void handleTrash(event); return; }
   if (mode.value === 'import') { handlePromptInput(event); return; }
   if (mode.value === 'settings') { void handleSettingsInput(event); return; }
   if (mode.value === "confirm-quit") return handleQuitConfirmation(event);
@@ -636,6 +709,8 @@ useInput(function handleInput(event) {
   if (event.type !== "text") return;
   if (event.text === "q") { requestQuit(); return; }
   if (event.text === "e") { enterEdit(); return; }
+  if (focusPane.value === 'main' && event.text === '[') { selectLink(-1); return; }
+  if (focusPane.value === 'main' && event.text === ']') { selectLink(1); return; }
   if (event.text.startsWith('/')) {
     enterCommands();
     if (event.text.length > 1) handlePromptInput({ ...event, text: event.text.slice(1) });
@@ -679,9 +754,9 @@ async function refreshVault(preferredNoteId?: string): Promise<void> {
 
 function moveSelection(delta: number): void {
   if (focusPane.value === "main") {
-    const max = mainView.value === "preview"
-      ? Math.max(0, previewLines.value.length - visibleRows.value)
-      : Math.max(0, activeBacklinks.value.length - visibleRows.value);
+    const max = mainView.value === 'preview' ? Math.max(0, previewLines.value.length - visibleRows.value)
+      : mainView.value === 'links' ? Math.max(0, brokenLinks.value.length - visibleRows.value + 2)
+        : Math.max(0, backlinkRows.value.length - visibleRows.value + 2);
     scrollOffset.value = clamp(scrollOffset.value + delta, 0, max);
     return;
   }
@@ -698,7 +773,8 @@ function moveToBoundary(value: number): void {
     syncActiveFromSelection();
     return;
   }
-  scrollOffset.value = value === 0 ? 0 : Math.max(0, previewLines.value.length - visibleRows.value);
+  const total = mainView.value === 'links' ? brokenLinks.value.length : mainView.value === 'backlinks' ? backlinkRows.value.length : previewLines.value.length;
+  scrollOffset.value = value === 0 ? 0 : Math.max(0, total - visibleRows.value);
 }
 
 function activateSelection(): void {
@@ -727,7 +803,37 @@ function enterSearch(): void {
   query.value = searchFilter.value;
   selectedIndex.value = 0;
   syncActiveFromSelection();
-  status.value = ui('Search titles and content', '搜索标题和内容');
+  status.value = ui('Search · tag: path: link: before: after: sort:recent|title', '搜索 · tag: path: link: before: after: sort:recent|title');
+}
+
+async function openTrash(): Promise<void> {
+  if (!canNavigateAway()) return;
+  try {
+    const removed = retentionLoaded.value ? await cleanupExpiredTrash() : 0;
+    trashEntries.value = await vault.listTrash(); trashIndex.value = 0; mode.value = 'trash';
+    status.value = ui(`${trashEntries.value.length} recoverable entries${removed ? ` · ${removed} expired permanently removed` : ''}`, `${trashEntries.value.length} 个可恢复项目${removed ? ` · ${removed} 个过期项目已永久清理` : ''}`);
+  } catch (error) { status.value = `${ui('Trash failed', '回收站读取失败')}: ${errorMessage(error)}`; }
+}
+
+async function handleTrash(event: TuiInputEvent): Promise<void> {
+  if (event.type !== 'key' || trashBusy.value) return;
+  const key = event.key.name;
+  if (key === 'escape') { mode.value = 'browse'; return; }
+  const last = Math.max(0, trashEntries.value.length - 1);
+  if (key === 'up' || key === 'down') trashIndex.value = wrapIndex(trashIndex.value, key === 'up' ? -1 : 1, trashEntries.value.length);
+  else if (key === 'page-up' || key === 'page-down') trashIndex.value = clamp(trashIndex.value + (key === 'page-up' ? -trashRows.value : trashRows.value), 0, last);
+  else if (key === 'home') trashIndex.value = 0;
+  else if (key === 'end') trashIndex.value = last;
+  else if (key === 'enter' && trashEntries.value[trashIndex.value]) {
+    trashBusy.value = true;
+    try {
+      const path = await vault.restoreEntry(trashEntries.value[trashIndex.value]!.id);
+      trashEntries.value = await vault.listTrash(); trashIndex.value = clamp(trashIndex.value, 0, Math.max(0, trashEntries.value.length - 1));
+      await refreshVault(path.replace(/\.md$/i, ''));
+      status.value = `${ui('Restored', '已恢复')} ${path}`;
+    } catch (error) { status.value = `${ui('Restore failed', '恢复失败')}: ${errorMessage(error)}`; }
+    finally { trashBusy.value = false; }
+  }
 }
 
 function enterCreate(): void {
@@ -853,7 +959,7 @@ function showView(view: MainView): void {
   mainView.value = view;
   focusPane.value = "main";
   scrollOffset.value = 0;
-  status.value = view === 'preview' ? ui('Preview', '预览') : view === 'backlinks' ? ui('Backlinks', '反向链接') : ui('Keyboard help', '键盘帮助');
+  status.value = view === 'preview' ? ui('Preview', '预览') : view === 'backlinks' ? ui('Backlinks', '反向链接') : view === 'links' ? ui('Broken links', '失效链接') : ui('Keyboard help', '键盘帮助');
 }
 
 function handlePromptInput(event: TuiInputEvent): void {
@@ -940,7 +1046,7 @@ function handlePromptInput(event: TuiInputEvent): void {
   const command = filteredCommands.value[commandIndex.value];
   if (!command) { status.value = ui('No matching command · change the filter or Esc to return', '没有匹配命令 · 修改筛选内容或按 Esc 返回'); return; }
   mode.value = commandReturn.value;
-  if (command.label === 'Keyboard help') mode.value = 'browse';
+  if (['Keyboard help', 'Link health', 'Backlinks'].includes(command.label)) mode.value = 'browse';
   void command.run();
 }
 
@@ -1023,11 +1129,13 @@ function handleEditorInput(event: TuiInputEvent): void {
   if (event.type === "paste") {
     if (!event.text) { void pasteClipboard(true); return; }
     closeSlashMenu();
+    wikiDismissed.value = false;
     editor.value = insertText(editor.value, event.text);
     ensureEditorCursorVisible();
     return;
   }
   if (event.type === "text") {
+    wikiDismissed.value = false;
     const openingSlash = event.text.startsWith("/") && slashStart.value === undefined;
     const insertionStart = selectionRange(editor.value).start;
     if (openingSlash) { slashOriginal = editor.value; slashHistoryCheckpoint = history.checkpoint(); }
@@ -1045,6 +1153,11 @@ function handleEditorInput(event: TuiInputEvent): void {
   const key = event.key;
   if (handleTextShortcut(key)) return;
   if (hasNonShiftModifier(key)) return;
+  if (wikiStart.value >= 0) {
+    if (key.name === 'escape') { wikiDismissed.value = true; status.value = ui('Wiki suggestions closed', '已关闭 Wiki 建议'); return; }
+    if (key.name === 'up' || key.name === 'down') { wikiIndex.value = wrapIndex(wikiIndex.value, key.name === 'up' ? -1 : 1, wikiCandidates.value.length); return; }
+    if (key.name === 'enter' || key.name === 'tab') { void insertWikiSelection(); return; }
+  }
   if (slashStart.value !== undefined) {
     if (key.name === "escape") {
       closeSlashMenu();
@@ -1066,6 +1179,7 @@ function handleEditorInput(event: TuiInputEvent): void {
           enterVaultFilePicker(slashStart.value, "image");
           return;
         }
+        if (command.action === 'extract-note') { void extractSelectionToNote(); return; }
         if (command.action === "save-note") {
           if (slashOriginal) {
             replayingHistory = true; editor.value = slashOriginal; replayingHistory = false;
@@ -1093,6 +1207,7 @@ function handleEditorInput(event: TuiInputEvent): void {
   }
   if (key.name === "backspace") {
     editor.value = backspace(editor.value);
+    wikiDismissed.value = false;
     validateSlashMenu();
   }
   else if (key.name === "delete") editor.value = deleteForward(editor.value);
@@ -1103,6 +1218,51 @@ function handleEditorInput(event: TuiInputEvent): void {
     editor.value = moveCursor(editor.value, key.name as "left" | "right" | "up" | "down" | "home" | "end");
   }
   ensureEditorCursorVisible();
+}
+
+async function insertWikiSelection(): Promise<void> {
+  const start = wikiStart.value;
+  if (start < 0) return;
+  let note = wikiCandidates.value[wikiIndex.value];
+  if (!note) {
+    const name = wikiQuery.value.trim();
+    if (!name) return;
+    try {
+      note = await vault.create(name);
+      notes.value = [...notes.value, note];
+      folders.value = await vault.loadFolders();
+      vaultFiles.value = [...vaultFiles.value, { path: note.path, relativePath: note.relativePath, name: note.relativePath.split('/').at(-1)! }];
+      selectTreeItem(`note:${activeNoteId.value ?? ''}`);
+    } catch (error) { status.value = `${ui('Create linked note failed', '创建链接笔记失败')}: ${errorMessage(error)}`; return; }
+  }
+  const end = editor.value.content.startsWith(']]', editor.value.cursor) ? editor.value.cursor + 2 : editor.value.cursor;
+  editor.value = { content: editor.value.content.slice(0, start) + `[[${note.id}]]` + editor.value.content.slice(end), cursor: start + note.id.length + 4 };
+  wikiDismissed.value = true;
+  status.value = `${ui('Linked', '已链接')} ${note.relativePath}`;
+  ensureEditorCursorVisible();
+}
+
+async function extractSelectionToNote(): Promise<void> {
+  const original = slashOriginal;
+  const selection = original ? selectedText(original) : '';
+  if (original) {
+    replayingHistory = true; editor.value = original; replayingHistory = false;
+    if (slashHistoryCheckpoint) history.restore(slashHistoryCheckpoint);
+  }
+  closeSlashMenu();
+  if (!selection.trim()) { status.value = ui('Select text before /extract-note', '请先选中文字，再使用 /extract-note'); return; }
+  const title = selection.trim().split('\n')[0]!.replace(/^#+\s*/, '').slice(0, 80);
+  try {
+    const note = await vault.create(title);
+    const saved = await vault.save(note, `${selection.trimEnd()}\n`);
+    notes.value = [...notes.value, saved];
+    folders.value = await vault.loadFolders();
+    vaultFiles.value = [...vaultFiles.value, { path: saved.path, relativePath: saved.relativePath, name: saved.relativePath.split('/').at(-1)! }];
+    selectTreeItem(`note:${activeNoteId.value ?? ''}`);
+    editor.value = insertText(original!, `[[${saved.id}]]`);
+    status.value = `${ui('Extracted', '已提取')} → ${saved.relativePath}`;
+    ensureEditorCursorVisible();
+  } catch (error) { status.value = `${ui('Extract failed', '提取失败')}: ${errorMessage(error)}`; }
 }
 
 function handleTextShortcut(key: TuiKey): boolean {
@@ -1343,7 +1503,7 @@ function followSelectedLink(): void {
   if (!canNavigateAway()) return;
   const target = activeLinks.value[selectedLinkIndex.value];
   if (!target) return;
-  const linked = vault.findLinkedNote(notes.value, target);
+  const linked = vault.findLinkedNote(notes.value, target, activeNote.value);
   if (!linked) {
     status.value = `${ui('Unresolved link', '无法解析链接')}: ${target}`;
     return;
@@ -1422,8 +1582,8 @@ function requestDeleteEntry(): void {
   deleteTarget.value = item;
   mode.value = "confirm-delete";
   status.value = item.kind === 'folder'
-    ? ui(`Permanently delete folder ${item.relativePath} and all contents? y/N`, `永久删除文件夹 ${item.relativePath} 及其全部内容？y/N`)
-    : ui(`Permanently delete file ${item.relativePath}? y/N`, `永久删除文件 ${item.relativePath}？y/N`);
+    ? ui(`Move folder ${item.relativePath} and all contents to Trash? y/N`, `将文件夹 ${item.relativePath} 及其全部内容移入回收站？y/N`)
+    : ui(`Move file ${item.relativePath} to Trash? y/N`, `将文件 ${item.relativePath} 移入回收站？y/N`);
 }
 
 function handleDeleteConfirmation(event: TuiInputEvent): void {
@@ -1448,7 +1608,7 @@ async function deleteConfirmedEntry(): Promise<void> {
       editingNoteId.value = undefined; editor.value = { content: "", cursor: 0 }; history.clear();
     }
     await refreshVault();
-    status.value = ui(`Deleted ${target.kind} ${target.relativePath}`, `已删除${target.kind === 'folder' ? '文件夹' : '文件'} ${target.relativePath}`);
+    status.value = ui(`Moved ${target.kind} ${target.relativePath} to Trash · /trash to restore`, `已将${target.kind === 'folder' ? '文件夹' : '文件'} ${target.relativePath} 移入回收站 · /trash 恢复`);
   } catch (error) {
     status.value = `${ui('Delete failed', '删除失败')}: ${errorMessage(error)}`;
   }
@@ -1567,7 +1727,15 @@ function errorMessage(error: unknown): string {
       </Box>
 
       <Box ref="mainBox" :flexGrow="1" :flexShrink="1" flexDirection="column" :paddingX="2">
-        <Box v-if="mode === 'ai-config'" flexDirection="column" :flexGrow="1" :paddingTop="1" overflow="hidden">
+        <Box v-if="mode === 'trash'" flexDirection="column" :flexGrow="1" :paddingTop="1" overflow="hidden">
+          <Text bold :color="theme.accent">◆ {{ ui('TRASH · RESTORE', '回收站 · 恢复') }}</Text>
+          <Text :color="theme.muted">{{ ui(`Kept for ${settings.trashRetentionDays} days, then permanently removed. Enter restores; name conflicts get a suffix.`, `保留 ${settings.trashRetentionDays} 天后永久清理。按 Enter 恢复；同名项目会添加后缀。`) }}</Text>
+          <Text v-if="!trashEntries.length" :color="theme.muted">{{ ui('Trash is empty.', '回收站为空。') }}</Text>
+          <Box v-for="(entry, index) in trashEntries.slice(trashWindowStart, trashWindowStart + trashRows)" :key="entry.id" :height="1" :flexShrink="0">
+            <Text :color="trashWindowStart + index === trashIndex ? theme.background : theme.foreground" :backgroundColor="trashWindowStart + index === trashIndex ? theme.accent : theme.background" wrap="truncate">{{ trashWindowStart + index === trashIndex ? '› ' : '  ' }}{{ entry.kind === 'folder' ? icons.folder : icons.note }} {{ entry.relativePath }} · {{ new Date(entry.deletedAt).toLocaleString() }}</Text>
+          </Box>
+        </Box>
+        <Box v-else-if="mode === 'ai-config'" flexDirection="column" :flexGrow="1" :paddingTop="1" overflow="hidden">
           <Box :height="1" :flexShrink="0" alignItems="center">
             <Text bold :color="theme.accent">◆ {{ ui('AI MODEL CONFIGURATION', 'AI 模型配置') }}</Text>
             <Box :flexGrow="1" />
@@ -1652,20 +1820,24 @@ function errorMessage(error: unknown): string {
           </Box>
           <Text :color="theme.muted">{{ ui('Personalize this vault; changes are saved immediately', '个性化当前 Vault；更改会立即保存') }}</Text>
           <Text> </Text>
-          <Box :height="bodyHeight >= 13 ? 3 : 2" :flexShrink="0" flexDirection="column">
+          <Box :height="bodyHeight >= 22 ? 3 : 2" :flexShrink="0" flexDirection="column">
             <Text :bold="settingIndex === 0" :color="settingIndex === 0 ? theme.background : theme.foreground" :backgroundColor="settingIndex === 0 ? theme.accent : theme.background" wrap="truncate">{{ settingIndex === 0 ? ' › ' : '   ' }}{{ ui('AUTO SAVE', '自动保存') }} · {{ settings.autoSave ? ui('[ ON ]', '[ 开启 ]') : ui('[ OFF ]', '[ 关闭 ]') }}</Text>
             <Text :color="theme.muted">   {{ ui('Save one second after typing stops', '停止输入一秒后自动保存') }}</Text>
           </Box>
-          <Box :height="bodyHeight >= 13 ? 3 : 2" :flexShrink="0" flexDirection="column">
+          <Box :height="bodyHeight >= 22 ? 3 : 2" :flexShrink="0" flexDirection="column">
             <Text :bold="settingIndex === 1" :color="settingIndex === 1 ? theme.background : theme.foreground" :backgroundColor="settingIndex === 1 ? theme.accent : theme.background" wrap="truncate">{{ settingIndex === 1 ? ' › ' : '   ' }}{{ ui('THEME', '主题') }} · {{ theme.name }}</Text>
             <Text :color="theme.muted">   Lattice · Nord · Dracula · Paper</Text>
           </Box>
-          <Box :height="bodyHeight >= 13 ? 3 : 2" :flexShrink="0" flexDirection="column">
+          <Box :height="bodyHeight >= 22 ? 3 : 2" :flexShrink="0" flexDirection="column">
             <Text :bold="settingIndex === 2" :color="settingIndex === 2 ? theme.background : theme.foreground" :backgroundColor="settingIndex === 2 ? theme.accent : theme.background" wrap="truncate">{{ settingIndex === 2 ? ' › ' : '   ' }}{{ ui('LANGUAGE', '语言') }} · {{ languages[settings.language] }}</Text>
             <Text :color="theme.muted">   {{ ui('English · 简体中文', '简体中文 · English') }}</Text>
           </Box>
-          <Box :height="bodyHeight >= 13 ? 3 : 2" :flexShrink="0" flexDirection="column">
-            <Text :bold="settingIndex === 3" :color="settingIndex === 3 ? theme.background : theme.foreground" :backgroundColor="settingIndex === 3 ? theme.accent : theme.background" wrap="truncate">{{ settingIndex === 3 ? ' › ' : '   ' }}{{ ui('AI MODEL', 'AI 模型') }} · {{ aiConfig.provider }} · {{ aiConfig.model }}</Text>
+          <Box :height="bodyHeight >= 22 ? 3 : 2" :flexShrink="0" flexDirection="column">
+            <Text :bold="settingIndex === 3" :color="settingIndex === 3 ? theme.background : theme.foreground" :backgroundColor="settingIndex === 3 ? theme.accent : theme.background" wrap="truncate">{{ settingIndex === 3 ? ' › ' : '   ' }}{{ ui('TRASH RETENTION', '回收站保留期') }} · {{ settings.trashRetentionDays }} {{ ui('days', '天') }}</Text>
+            <Text :color="theme.muted">   {{ ui('Permanently remove expired entries · 7 / 30 / 90 days', '到期后永久清理 · 7 / 30 / 90 天') }}</Text>
+          </Box>
+          <Box :height="bodyHeight >= 22 ? 3 : 2" :flexShrink="0" flexDirection="column">
+            <Text :bold="settingIndex === 4" :color="settingIndex === 4 ? theme.background : theme.foreground" :backgroundColor="settingIndex === 4 ? theme.accent : theme.background" wrap="truncate">{{ settingIndex === 4 ? ' › ' : '   ' }}{{ ui('AI MODEL', 'AI 模型') }} · {{ aiConfig.provider }} · {{ aiConfig.model }}</Text>
             <Text :color="theme.muted">   {{ ui(`${enterLabel} opens provider configuration`, `${enterLabel} 打开模型配置`) }}</Text>
           </Box>
           <Box :flexGrow="1" />
@@ -1789,6 +1961,11 @@ function errorMessage(error: unknown): string {
                 </Box>
               </template>
             </Box>
+            <Box v-if="wikiStart >= 0" flexDirection="column" :marginTop="1" :paddingX="1" borderTop :borderBottom="false" :borderLeft="false" :borderRight="false" borderStyle="single" :borderColor="theme.border">
+              <Text bold :color="theme.accent">[[ {{ ui('LINK NOTE', '链接笔记') }} · {{ wikiQuery || ui('all notes', '全部笔记') }}</Text>
+              <Text v-if="!wikiCandidates.length" :color="theme.muted">{{ wikiQuery ? ui('Enter creates this note', '按 Enter 创建这篇笔记') : ui('No notes found', '没有找到笔记') }}</Text>
+              <Text v-for="(note, index) in wikiCandidates.slice(wikiWindowStart, wikiWindowStart + 5)" v-else :key="note.id" :color="wikiWindowStart + index === wikiIndex ? theme.background : theme.foreground" :backgroundColor="wikiWindowStart + index === wikiIndex ? theme.accent : theme.background" wrap="truncate">{{ wikiWindowStart + index === wikiIndex ? '› ' : '  ' }}{{ note.relativePath }} · {{ note.title }}</Text>
+            </Box>
           </Box>
 
           <Box ref="liveBox" :flexBasis="0" :flexGrow="1" :flexShrink="1" flexDirection="column" :paddingLeft="2">
@@ -1816,10 +1993,10 @@ function errorMessage(error: unknown): string {
         <Box v-else-if="mainView === 'help'" flexDirection="column" :paddingTop="1">
           <Text bold color="#9ee493">{{ ui('KEYBOARD REFERENCE', '键盘操作参考') }}</Text>
           <Text :color="theme.muted">{{ keymapLabel }} · {{ ui('application actions use / commands; combinations below edit text only.', '应用功能使用 / 命令；以下组合键仅用于文本编辑。') }}</Text>
-          <Text><Text color="cyan" bold>/help · /rename · /delete</Text> {{ ui('all application actions use bottom slash commands', '应用功能均通过底部斜杠命令执行') }}</Text>
+          <Text><Text color="cyan" bold>/help · /rename · /delete · /trash</Text> {{ ui('application actions use bottom slash commands', '应用功能通过底部斜杠命令执行') }}</Text>
           <Text><Text color="cyan" bold>{{ tabLabel }} · ↑↓ · {{ enterLabel }} · e/q</Text> {{ ui('switch pane · move · open · edit/quit', '切换窗格 · 移动 · 打开 · 编辑/退出') }}</Text>
           <Text><Text color="cyan" bold>← / →             </Text>{{ ui('collapse / expand folder', '折叠 / 展开文件夹') }}</Text>
-          <Text><Text color="cyan" bold>/ · /search · /file · /image</Text> {{ ui('commands / search / editor insertions', '命令 / 搜索 / 编辑器插入') }}</Text>
+          <Text><Text color="cyan" bold>/search · /links · /backlinks · [[</Text> {{ ui('find notes / inspect and complete Wiki links', '查找笔记 / 检查并补全 Wiki 链接') }}</Text>
           <Text bold color="#f7c873">{{ ui('TEXT EDITING · ALL SYSTEMS', '文本编辑 · 所有系统') }}</Text>
           <Text><Text color="cyan" bold>{{ controlKey("F/R") }}           </Text>{{ ui('find / find and replace in the current note', '在当前笔记中查找 / 查找替换') }}</Text>
           <Text><Text color="cyan" bold>{{ controlKey("A/C/X/V") }}       </Text>{{ ui('select all / copy / cut / paste', '全选 / 复制 / 剪切 / 粘贴') }}</Text>
@@ -1831,6 +2008,11 @@ function errorMessage(error: unknown): string {
           <Text><Text color="cyan" bold>{{ ui('Mouse', '鼠标') }}              </Text>{{ ui('click cursor · drag selection · wheel scroll', '点击定位 · 拖动选择 · 滚轮滚动') }}</Text>
         </Box>
 
+        <Box v-else-if="mainView === 'links'" flexDirection="column">
+          <Text bold :color="theme.accent">{{ ui('UNRESOLVED WIKI LINKS', '未解析的 Wiki 链接') }} · {{ brokenLinks.length }}</Text>
+          <Text v-if="!brokenLinks.length" :color="theme.muted">{{ ui('All wiki links resolve.', '所有 Wiki 链接均可解析。') }}</Text>
+          <Text v-for="(item, index) in brokenLinks.slice(scrollOffset, scrollOffset + visibleRows - 2)" v-else :key="`${item.note.id}:${item.link.start}:${index}`" :color="theme.foreground" wrap="truncate">{{ item.note.relativePath }} → <Text color="yellow">{{ item.link.target }}</Text> · <Text :color="theme.muted">{{ item.link.line }}</Text></Text>
+        </Box>
         <Box v-else-if="mainView === 'backlinks'" flexDirection="column">
           <Box :height="2" :flexShrink="0" alignItems="center">
             <Text bold color="#c792ea">{{ ui('BACKLINKS', '反向链接') }} · {{ activeNote?.title }}</Text>
@@ -1838,7 +2020,7 @@ function errorMessage(error: unknown): string {
             <Text :color="theme.muted">{{ ui(`${activeBacklinks.length} references`, `${activeBacklinks.length} 个引用`) }}</Text>
           </Box>
           <Text v-if="!activeBacklinks.length" :color="theme.muted">{{ ui('No notes link here yet.', '尚无笔记链接到这里。') }}</Text>
-          <Text v-for="note in activeBacklinks" v-else :key="note.id" :color="theme.foreground">← <Text color="cyan" underline>{{ note.title }}</Text>  <Text dimColor>{{ note.relativePath }}</Text></Text>
+          <Text v-for="row in backlinkRows.slice(scrollOffset, scrollOffset + visibleRows - 2)" v-else :key="row.key" :color="row.title ? theme.accent : theme.muted" wrap="truncate">{{ row.text }}</Text>
         </Box>
 
         <Box v-else-if="activeNote" ref="readBox" flexDirection="column">
@@ -1847,6 +2029,7 @@ function errorMessage(error: unknown): string {
             <Box :flexGrow="1" />
             <Text v-if="activeNote.tags.length" :color="theme.muted" wrap="truncate">{{ activeNote.tags.map(tag => `#${tag}`).join(" ") }}</Text>
           </Box>
+          <Text v-if="searchFilter && selectedSearchHit" :color="theme.muted" wrap="truncate">{{ ui('MATCH', '命中') }} · {{ searchHighlight.before }}<Text bold :color="theme.accent" underline>{{ searchHighlight.match }}</Text>{{ searchHighlight.after }}</Text>
           <Text v-for="(line, index) in visiblePreview" :key="scrollOffset + index" :color="theme.foreground" wrap="truncate">
             <Text :backgroundColor="line.backgroundColor">{{ "  ".repeat(line.indent) }}</Text><Text
               v-for="(segment, segmentIndex) in line.segments"
